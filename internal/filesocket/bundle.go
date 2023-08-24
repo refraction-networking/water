@@ -50,6 +50,7 @@ func (b *bundle) Start() {
 	go func() {
 		io.Copy(b.Conn, b.fs)
 		b.Conn.Close()
+		b.fs.Close() // TODO: is this necessary? now added just to be safe
 	}()
 }
 
