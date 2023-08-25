@@ -2,6 +2,7 @@ package water
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"strings"
 )
@@ -49,14 +50,8 @@ func (d *tlsDialer) Dial(network, address string) (net.Conn, error) {
 	d.tlsConfig.ServerName = strings.Split(address, ":")[0] // "example.com:443" -> "example.com"
 	tlsConn, err := tls.Dial(network, address, d.tlsConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("tls.Dial(): %w", err)
 	}
-
-	err = tlsConn.Handshake() // should complete TLS handshake before returning to reduce overhead later
-	if err != nil {
-		return nil, err
-	}
-
 	return tlsConn, nil
 }
 

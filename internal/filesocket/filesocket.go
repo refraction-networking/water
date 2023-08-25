@@ -32,13 +32,19 @@ func (fs *fileSocket) Read(p []byte) (n int, err error) {
 	if fs.rdFile == nil {
 		return 0, os.ErrInvalid
 	}
-	n, err = fs.rdFile.Read(p)
-	if err != nil && !errors.Is(err, io.EOF) {
-		if errors.Is(err, os.ErrClosed) && fs.closed.Load() {
-			err = io.EOF // when closed by caller, return EOF instead
+
+	// if everything new in file has been read, it will return EOF.
+	// In which case, we want to block on retrying until there is new data.
+	for n == 0 {
+		n, err = fs.rdFile.Read(p)
+		if err != nil && !errors.Is(err, io.EOF) {
+			if errors.Is(err, os.ErrClosed) && fs.closed.Load() {
+				err = io.EOF // when closed by caller, return EOF instead
+			}
+			return 0, err
 		}
-		return 0, err
 	}
+
 	return n, nil
 }
 
