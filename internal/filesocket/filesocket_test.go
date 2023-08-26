@@ -131,8 +131,12 @@ func testTempFileSocket(t *testing.T) {
 			buf := make([]byte, 1024)
 			n, err := fs.Read(buf)
 			if err != nil {
-				if errors.Is(err, os.ErrClosed) {
-					t.Logf("fs.Read(): file socket closed")
+				if errors.Is(err, os.ErrClosed) && fs.(*fileSocket).closed.Load() {
+					t.Logf("fs.Read(): reading from closed socket")
+					return
+				}
+				if errors.Is(err, io.EOF) {
+					t.Logf("fs.Read(): EOF")
 					return
 				}
 				t.Errorf("fs.Read() errored: %v", err)
