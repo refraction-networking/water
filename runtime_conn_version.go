@@ -159,6 +159,10 @@ func (rcv *RuntimeConnV0) SetDeadline(t time.Time) error {
 // SetReadDeadline implements the net.Conn interface.
 //
 // It calls to the underlying user-oriented connection's SetReadDeadline() method.
+//
+// Note: in practice this method should actively be used by the caller. Otherwise
+// it is possible for a silently failed network connection to cause the WASM module
+// to hang forever on Read().
 func (rcv *RuntimeConnV0) SetReadDeadline(t time.Time) error {
 	return rcv.uoConn.SetReadDeadline(t)
 }
