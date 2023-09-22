@@ -2,16 +2,9 @@ package water
 
 import (
 	"fmt"
-	"net"
 
 	"github.com/bytecodealliance/wasmtime-go/v12"
 )
-
-// RuntimeConn defines an interface that all implementations of RuntimeConn
-// must implement no matter of which version it is.
-type RuntimeConn interface {
-	net.Conn
-}
 
 // runtimeCore provides the WASM runtime base and is an internal struct
 // that every RuntimeXxx implementation will embed.

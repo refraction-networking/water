@@ -11,6 +11,12 @@ import (
 	"github.com/gaukas/water/socket"
 )
 
+// RuntimeConn defines an interface that all implementations of RuntimeConn
+// must implement no matter of which version it is.
+type RuntimeConn interface {
+	net.Conn
+}
+
 const (
 	RUNTIME_VERSION_ZERO int32 = iota
 )
