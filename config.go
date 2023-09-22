@@ -1,21 +1,21 @@
 package water
 
 type Config struct {
-	// WASI contains the compiled WASI binary in bytes.
-	WASI []byte
-
-	// Dialer is used to dial a network connection.
-	Dialer Dialer
+	Dialer   Dialer  // A dialer supporting multiple network types.
+	Feature  Feature // Bit-masked experimental features
+	WABin    []byte  // WebAssembly module binary.
+	WAConfig []byte  // WebAssembly module config file, if any.
 }
 
-// init() checks if the Config is valid and initializes
-// the Config with default values if optional fields are not provided.
+// complete the config by filling in the missing optional fields
+// with fault values and panic if any of the required fields are not
+// provided.
 func (c *Config) init() {
-	if len(c.WASI) == 0 {
-		panic("water: WASI binary is not provided")
-	}
-
 	if c.Dialer == nil {
 		c.Dialer = DefaultDialer()
+	}
+
+	if len(c.WABin) == 0 {
+		panic("water: WASI binary is not provided")
 	}
 }
