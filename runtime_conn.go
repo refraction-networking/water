@@ -5,8 +5,9 @@ import (
 	"net"
 )
 
-var mapOBRCV = make(map[int32]func(*runtimeCore) (RuntimeConn, error))
-var mapIBRCV = make(map[int32]func(*runtimeCore, net.Conn) (RuntimeConn, error))
+var mapOBRCV = make(map[int32]func(*runtimeCore) (RuntimeConn, error)) // OutboundRuntimeConnWithVersion
+var mapIBRCV = make(map[int32]func(*runtimeCore) (RuntimeConn, error)) // InboundRuntimeConnWithVersion
+var mapRLRCV = make(map[int32]func(*runtimeCore) (RuntimeConn, error)) // RelayingRuntimeConnWithVersion
 
 // RuntimeConn is an interface for a Conn-like object that encapsulates
 // a WASM runtime core.
@@ -34,17 +35,34 @@ func RegisterOutboundRuntimeConnWithVersion(version int32, f func(*runtimeCore) 
 
 // InboundRuntimeConnWithVersion spins up a RuntimeConn of the corresponding version with the
 // given core and (implicitly) initializes it.
-func InboundRuntimeConnWithVersion(core *runtimeCore, version int32, ibc net.Conn) (RuntimeConn, error) {
+func InboundRuntimeConnWithVersion(core *runtimeCore, version int32) (RuntimeConn, error) {
 	if f, ok := mapIBRCV[version]; !ok {
 		return nil, fmt.Errorf("water: unknown version: %d", version)
 	} else {
-		return f(core, ibc)
+		return f(core)
 	}
 }
 
-func RegisterInboundRuntimeConnWithVersion(version int32, f func(*runtimeCore, net.Conn) (RuntimeConn, error)) {
+func RegisterInboundRuntimeConnWithVersion(version int32, f func(*runtimeCore) (RuntimeConn, error)) {
 	if _, ok := mapIBRCV[version]; ok {
 		panic(fmt.Sprintf("water: version %d already registered", version))
 	}
 	mapIBRCV[version] = f
+}
+
+// RelayingRuntimeConnWithVersion spins up a RuntimeConn of the corresponding version with the
+// given core and (implicitly) initializes it.
+func RelayingRuntimeConnWithVersion(core *runtimeCore, version int32) (RuntimeConn, error) {
+	if f, ok := mapRLRCV[version]; !ok {
+		return nil, fmt.Errorf("water: unknown version: %d", version)
+	} else {
+		return f(core)
+	}
+}
+
+func RegisterRelayingRuntimeConnWithVersion(version int32, f func(*runtimeCore) (RuntimeConn, error)) {
+	if _, ok := mapRLRCV[version]; ok {
+		panic(fmt.Sprintf("water: version %d already registered", version))
+	}
+	mapRLRCV[version] = f
 }

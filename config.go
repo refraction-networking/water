@@ -6,27 +6,25 @@ import (
 )
 
 type Config struct {
-	// NetworkDialer is a dialer that dials a network address.
-	// It will be used to provide network access to the WASM
-	// instance.
-	// If not specified, a default dialer will be used.
-	//
-	// Used by Dialer when calling DialConfig() or (*Dialer).Dial().
-	// Used by Server when calling ServeConfig() or (*Server).Serve().
-	NetworkDialer NetworkDialer
-
-	// ApplicationProtocolWrapper is a wrapper function that wraps around
-	// a given net.Conn to provide additional Application protocol
-	// support, such as TLS.
+	// ApplicationProtocolWrapper is a wrapper function that wraps
+	// around a given net.Conn to provide out of box application
+	// protocol support, such as TLS.
 	//
 	// TODO: implement this feature
-	// ApplicationProtocolWrapper ApplicationProtocolWrapper
+	WASIApplicationProtocolWrapper WASIApplicationProtocolWrapper
+
+	// EmbedDialer provides a dialer func that dials a remote
+	// network address. It enables the configured Dialer/Relay
+	// to dial a network address for the WASM module.
+	//
+	// If not specified, a default dialer func will be used.
+	EmbedDialer func(network, address string) (net.Conn, error)
 
 	// NetworkListener points to a listener that listens on a
 	// network address. It will be used to provide incoming
 	// network connections to the WASM instance. Required by
 	// ListenConfig().
-	NetworkListener net.Listener
+	EmbedListener net.Listener
 
 	// Feature specifies a series of experimental features to enable
 	// for the WASM runtime.
@@ -43,7 +41,7 @@ type Config struct {
 	// This field is required.
 	WABin []byte
 
-	// WAConfig defines the configuration file used by the WASM module.
+	// WAConfig defines the configuration file to be pushed into the WASM module.
 	WAConfig WAConfig
 
 	// WasiConfigFactory is used to replicate the WASI config
@@ -51,19 +49,19 @@ type Config struct {
 	WASIConfigFactory *WASIConfigFactory
 }
 
-func (c *Config) defaultNetworkDialerIfNotSet() {
-	if c.NetworkDialer == nil {
-		c.NetworkDialer = DefaultNetworkDialer()
+func (c *Config) embedDialerOrDefault() {
+	if c.EmbedDialer == nil {
+		c.EmbedDialer = net.Dial
 	}
 }
 
-func (c *Config) requireNetworkListener() {
-	if c.NetworkListener == nil {
-		panic("water: NetworkListener is not provided")
+func (c *Config) mustEmbedListener() {
+	if c.EmbedListener == nil {
+		panic("water: no listener is provided")
 	}
 }
 
-func (c *Config) requireWABin() {
+func (c *Config) mustSetWABin() {
 	if len(c.WABin) == 0 {
 		panic("water: WASI binary is not provided")
 	}

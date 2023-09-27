@@ -1,6 +1,9 @@
 package water
 
-import "net"
+import (
+	"fmt"
+	"net"
+)
 
 // Listener listens on a local network address and upon caller
 // calling Accept(), it accepts an incoming connection and
@@ -29,17 +32,26 @@ type Listener struct {
 }
 
 func (l *Listener) Accept() (RuntimeConn, error) {
-	ibc, err := l.l.Accept()
-	if err != nil {
-		return nil, err
+	if l.Config == nil {
+		return nil, fmt.Errorf("water: dialing with nil config is not allowed")
 	}
+	if l.l == nil {
+		l.Config.mustEmbedListener()
+	}
+	l.l = l.Config.EmbedListener
+
+	l.Config.mustSetWABin()
+
 	var core *runtimeCore
+	var err error
 	core, err = Core(l.Config)
 	if err != nil {
 		return nil, err
 	}
-	// link defer funcs
-	if err = core.LinkDefer(); err != nil {
+
+	// link listener funcs
+	wasiListener := MakeWASIListener(l.l, l.Config.WASIApplicationProtocolWrapper)
+	if err = core.LinkNetworkInterface(nil, wasiListener); err != nil {
 		return nil, err
 	}
 
@@ -48,5 +60,5 @@ func (l *Listener) Accept() (RuntimeConn, error) {
 		return nil, err
 	}
 
-	return core.InboundRuntimeConn(ibc) // will return versioned RuntimeConn
+	return core.InboundRuntimeConn()
 }
