@@ -38,7 +38,7 @@ type RuntimeConnV0 struct {
 	_config *wasmtime.Func // _config(fd i32)
 
 	// _dial:
-	//  - Calls to `env.dial(apw) -> fd i32` to dial a network connection (wrapped with the
+	//  - Calls to `env.dialh(apw) -> fd i32` to dial a network connection (wrapped with the
 	//  application protocol) and bind it to one of its file descriptors, record the fd as
 	//  `remoteConnFd`. This will be the fd it used to read/write data from/to the remote
 	//  destination.
@@ -48,7 +48,7 @@ type RuntimeConnV0 struct {
 	_dial *wasmtime.Func // _dial(callerConnFd i32) (remoteConnFd i32)
 
 	// _accept:
-	//  - Calls to `env.accept(apw) -> fd i32` to accept a network connection (wrapped with the
+	//  - Calls to `env.accepth(apw) -> fd i32` to accept a network connection (wrapped with the
 	//  application protocol) and bind it to one of its file descriptors, record the fd as
 	//  `sourceConnFd`. This will be the fd it used to read/write data from/to the source
 	//  address.
@@ -58,17 +58,19 @@ type RuntimeConnV0 struct {
 	_accept *wasmtime.Func // _accept(callerConnFd i32) (sourceConnFd i32)
 
 	// _assoc:
-	//  - Calls to `env.accept(apw) -> fd i32` to accept a network connection (wrapped with the
+	//  - Calls to `env.accepth(apw) -> fd i32` to accept a network connection (wrapped with the
 	//  application protocol) and bind it to one of its file descriptors, record the fd as
 	//  `sourceConnFd`. This will be the fd it used to read/write data from/to the source
 	//  address.
-	//  - Calls to `env.dial(apw) -> fd i32` to dial a network connection (wrapped with the
+	//  - Calls to `env.dialh(apw) -> fd i32` to dial a network connection (wrapped with the
 	//  application protocol) and bind it to one of its file descriptors, record the fd as
 	//  `remoteConnFd`. This will be the fd it used to read/write data from/to the remote
 	//  destination.
 	//  - Calling `_assoc()` DOES NOT automatically start relaying data between the two
-	//  connections. How to relay data is up to the WASM module per version spec.
-	_assoc *wasmtime.Func // _assoc()
+	//  connections.
+	_assoc *wasmtime.Func // _assoc() (err i32)
+
+	_relay *wasmtime.Func // _relay(), blocking
 
 	// _close:
 	//  - Closes the all the file descriptors it owns.
@@ -81,15 +83,14 @@ type RuntimeConnV0 struct {
 	//  - if `callerConnFd` is invalid, this will return an error.
 	//  - if `sourceConnFd` is valid, this will read from `callerConnFd` and write to `sourceConnFd`.
 	//  - if `remoteConnFd` is valid, this will read from `callerConnFd` and write to `remoteConnFd`.
-	// WASM will prepare a buffer at least `expected` bytes long before reading from `callerConnFd`.
-	_write *wasmtime.Func // _write(expected int32) (actual int32)
+	_write *wasmtime.Func // _write() (err int32)
 
 	// _read:
 	//  - if both `sourceConnFd` and `remoteConnFd` are valid, this will be a no-op.
 	//  - if `callerConnFd` is invalid, this will return an error.
 	//  - if `sourceConnFd` is valid, this will read from `sourceConnFd` and write to `callerConnFd`.
 	//  - if `remoteConnFd` is valid, this will read from `remoteConnFd` and write to `callerConnFd`.
-	_read *wasmtime.Func // _read()
+	_read *wasmtime.Func // _read() (err int32)
 }
 
 func NewOutboundRuntimeConnV0(core *runtimeCore) (RuntimeConn, error) {
@@ -131,9 +132,17 @@ func (rcv *RuntimeConnV0) Read(b []byte) (n int, err error) {
 	}
 
 	// call _read
-	_, err = rcv._read.Call(rcv.core.store)
+	ret, err := rcv._read.Call(rcv.core.store)
 	if err != nil {
 		return 0, fmt.Errorf("water: (*wasmtime.Func).Call returned error: %w", err)
+	}
+
+	if ret32, ok := ret.(int32); !ok {
+		return 0, fmt.Errorf("water: (*wasmtime.Func).Call returned non-int32 value")
+	} else {
+		if ret32 != 0 {
+			return 0, WASMErr(ret32)
+		}
 	}
 
 	return rcv.uoConn.Read(b)
@@ -161,20 +170,15 @@ func (rcv *RuntimeConnV0) Write(b []byte) (n int, err error) {
 	}
 
 	// call _write to notify WASM
-	ret, err := rcv._write.Call(rcv.core.store, int32(len(b)))
+	ret, err := rcv._write.Call(rcv.core.store)
 	if err != nil {
 		return 0, fmt.Errorf("water: (*wasmtime.Func).Call returned error: %w", err)
 	}
 
-	if actualWritten, ok := ret.(int32); !ok {
+	if ret32, ok := ret.(int32); !ok {
 		return 0, fmt.Errorf("water: (*wasmtime.Func).Call returned non-int32 value")
 	} else {
-		if actualWritten < int32(n) {
-			return int(actualWritten), io.ErrShortWrite
-		} else if actualWritten > int32(n) {
-			return int(actualWritten), errors.New("invalid write result") // io.errInvalidWrite
-		}
-		return int(actualWritten), nil
+		return n, WASMErr(ret32)
 	}
 }
 
@@ -336,12 +340,14 @@ func (rcv *RuntimeConnV0) initializeOutboundConn() error {
 	// type assertion
 	if netFdInt32, ok := netFd.(int32); !ok {
 		return fmt.Errorf("_dial returned non-int32 value")
-	} else {
+	} else if netFdInt32 > 0 {
 		// get the net.Conn from the WASM's world
 		rcv.networkConn = rcv.core.wd.GetConnByFd(netFdInt32)
 		if rcv.networkConn == nil {
 			return fmt.Errorf("_dial returned invalid net.Conn")
 		}
+	} else { // error code returned
+		return WASMErr(netFdInt32)
 	}
 
 	return nil
@@ -364,7 +370,7 @@ func (rcv *RuntimeConnV0) initializeInboundConn() error {
 	}
 
 	rcv._accept = rcv.core.instance.GetFunc(rcv.core.store, "_accept")
-	if rcv._dial == nil {
+	if rcv._accept == nil {
 		return fmt.Errorf("WASM module missing required function _accept for V0")
 	}
 
@@ -388,12 +394,14 @@ func (rcv *RuntimeConnV0) initializeInboundConn() error {
 	// type assertion
 	if netFdInt32, ok := netFd.(int32); !ok {
 		return fmt.Errorf("_accept returned non-int32 value")
-	} else {
+	} else if netFdInt32 > 0 {
 		// get the net.Conn from the WASM's world
-		rcv.networkConn = rcv.core.wd.GetConnByFd(netFdInt32)
+		rcv.networkConn = rcv.core.wl.GetConnByFd(netFdInt32)
 		if rcv.networkConn == nil {
 			return fmt.Errorf("_accept returned invalid net.Conn")
 		}
+	} else { // error code returned
+		return WASMErr(netFdInt32)
 	}
 
 	return nil
@@ -415,11 +423,20 @@ func (rcv *RuntimeConnV0) initializeRelayingConn() error {
 		return fmt.Errorf("WASM module missing required function _assoc for V0")
 	}
 
+	rcv._relay = rcv.core.instance.GetFunc(rcv.core.store, "_relay")
+	if rcv._relay == nil {
+		return fmt.Errorf("WASM module missing required function _relay for V0")
+	}
+
 	// call _assoc
-	_, err = rcv._assoc.Call(rcv.core.store)
+	ret, err := rcv._assoc.Call(rcv.core.store)
 	if err != nil {
 		return fmt.Errorf("_assoc returned error: %w", err)
 	}
 
-	return nil
+	if ret32, ok := ret.(int32); !ok {
+		return fmt.Errorf("_assoc returned non-int32 value")
+	} else {
+		return WASMErr(ret32)
+	}
 }

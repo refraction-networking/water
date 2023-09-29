@@ -82,7 +82,7 @@ func (c *runtimeCore) linkExecDeferredFunc() error {
 		return fmt.Errorf("water: linker not set, is runtimeCore initialized?")
 	}
 
-	if err := c.linker.FuncNew("env", "defer",
+	if err := c.linker.FuncNew("env", "deferh",
 		wasmtime.NewFuncType(
 			[]*wasmtime.ValType{},
 			[]*wasmtime.ValType{},
@@ -197,7 +197,7 @@ func (c *runtimeCore) execDeferredFunc() {
 }
 
 func (c *runtimeCore) linkWASIDialFunc(f WASIConnectFunc) error {
-	err := c.linker.FuncNew("env", "dial", WASIConnectFuncType, WrapWASIConnectFunc(f))
+	err := c.linker.FuncNew("env", "dialh", WASIConnectFuncType, WrapWASIConnectFunc(f))
 	if err != nil {
 		return fmt.Errorf("(*wasmtime.Linker).FuncNew: %w", err)
 	}
@@ -209,7 +209,7 @@ func (c *runtimeCore) linkNOPWASIDialFunc() error {
 }
 
 func (c *runtimeCore) linkWASIAcceptFunc(f WASIConnectFunc) error {
-	err := c.linker.FuncNew("env", "accept", WASIConnectFuncType, WrapWASIConnectFunc(f))
+	err := c.linker.FuncNew("env", "accepth", WASIConnectFuncType, WrapWASIConnectFunc(f))
 	if err != nil {
 		return fmt.Errorf("(*wasmtime.Linker).FuncNew: %w", err)
 	}

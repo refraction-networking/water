@@ -10,7 +10,7 @@ type WASIConfigFactory struct {
 	setupFuncs []func(*wasmtime.WasiConfig) error // if any of these functions returns an error, the whole setup will fail.
 }
 
-func NewWasiConfigEngine() *WASIConfigFactory {
+func NewWasiConfigFactory() *WASIConfigFactory {
 	return &WASIConfigFactory{
 		setupFuncs: make([]func(*wasmtime.WasiConfig) error, 0),
 	}

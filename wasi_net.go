@@ -65,8 +65,9 @@ func MakeWASIListener(listener net.Listener, apw WASIApplicationProtocolWrapper)
 	}
 
 	return &WASIListener{
-		listener: listener,
-		apw:      apw,
+		listener:  listener,
+		apw:       apw,
+		mapFdConn: make(map[int32]net.Conn),
 	}
 }
 

@@ -3,6 +3,7 @@ package water
 import (
 	"fmt"
 	"net"
+	"sync/atomic"
 )
 
 // Listener listens on a local network address and upon caller
@@ -29,16 +30,35 @@ import (
 type Listener struct {
 	Config *Config
 	l      net.Listener
+
+	closed *atomic.Bool
 }
 
-func (l *Listener) Accept() (RuntimeConn, error) {
+func ListenConfig(network, address string, config *Config) (net.Listener, error) {
+	lis, err := net.Listen(network, address)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Listener{
+		Config: config,
+		l:      lis,
+		closed: new(atomic.Bool),
+	}, nil
+}
+
+func (l *Listener) Accept() (net.Conn, error) {
+	if l.closed.Load() {
+		return nil, fmt.Errorf("water: listener is closed")
+	}
+
 	if l.Config == nil {
 		return nil, fmt.Errorf("water: dialing with nil config is not allowed")
 	}
 	if l.l == nil {
 		l.Config.mustEmbedListener()
+		l.l = l.Config.EmbedListener
 	}
-	l.l = l.Config.EmbedListener
 
 	l.Config.mustSetWABin()
 
@@ -61,4 +81,15 @@ func (l *Listener) Accept() (RuntimeConn, error) {
 	}
 
 	return core.InboundRuntimeConn()
+}
+
+func (l *Listener) Close() error {
+	if l.closed.CompareAndSwap(false, true) {
+		return l.l.Close()
+	}
+	return nil
+}
+
+func (l *Listener) Addr() net.Addr {
+	return l.l.Addr()
 }
