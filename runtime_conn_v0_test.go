@@ -3,12 +3,14 @@
 package water_test
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"net"
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gaukas/water"
 )
@@ -252,4 +254,80 @@ func testLowercaseHexencoderConn(encoderConn, plainConn net.Conn, dMsg, lMsg []b
 	}
 
 	return nil
+}
+
+func BenchmarkRuntimeConnV0(b *testing.B) {
+	// read file into hexencoder_v0
+	var err error
+	hexencoder_v0, err = os.ReadFile("./testdata/hexencoder_v0.wasm")
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Run("Dialer", benchmarkDialerV0)
+	// b.Run("Listener", benchmarkListenerV0)
+}
+
+func benchmarkDialerV0(b *testing.B) {
+	// create random TCP listener listening on localhost
+	tcpLis, err := net.ListenTCP("tcp", nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer tcpLis.Close()
+
+	// goroutine to accept incoming connections
+	var lisConn net.Conn
+	var wg *sync.WaitGroup = new(sync.WaitGroup)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		var err error
+		lisConn, err = tcpLis.Accept()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+
+	// Dial
+	dialer := &water.Dialer{
+		Config: &water.Config{
+			WABin: hexencoder_v0,
+			WAConfig: water.WAConfig{
+				FilePath: "./testdata/hexencoder_v0.dialer.json",
+			},
+			WASIConfigFactory: water.NewWasiConfigFactory(),
+		},
+	}
+	dialer.Config.WASIConfigFactory.InheritStdout()
+
+	rConn, err := dialer.Dial("tcp", tcpLis.Addr().String())
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer rConn.Close()
+
+	// wait for listener to accept connection
+	wg.Wait()
+
+	b.ResetTimer()
+	b.SetBytes(1024) // we will send 512-byte data and 128-byte will be transmitted on wire due to hex encoding
+	var sendMsg []byte = make([]byte, 512)
+	rand.Read(sendMsg)
+	for i := 0; i < b.N; i++ {
+		_, err = rConn.Write(sendMsg)
+		if err != nil {
+			b.Logf("cntr: %d, N: %d", i, b.N)
+			b.Fatal(err)
+		}
+
+		// receive data
+		buf := make([]byte, 1024)
+		_, err = lisConn.Read(buf)
+		if err != nil {
+			b.Logf("cntr: %d, N: %d", i, b.N)
+			b.Fatal(err)
+		}
+
+		time.Sleep(10 * time.Microsecond)
+	}
 }
