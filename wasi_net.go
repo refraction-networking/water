@@ -5,6 +5,7 @@ package water
 import (
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/bytecodealliance/wasmtime-go/v13"
 	"github.com/gaukas/water/socket"
@@ -50,9 +51,10 @@ func nopWASIConnectFunc(caller *wasmtime.Caller, applicationProtocol int32) (fd 
 }
 
 type WASIListener struct {
-	listener  net.Listener
-	apw       WASIApplicationProtocolWrapper
-	mapFdConn map[int32]net.Conn // saves all the connections accepted by this WASIListener by their file descriptors!
+	listener        net.Listener
+	apw             WASIApplicationProtocolWrapper
+	mapFdConn       map[int32]net.Conn // saves all the connections accepted by this WASIListener by their file descriptors!
+	mapFdClonedFile map[int32]*os.File // saves all files so GC won't close them
 }
 
 func MakeWASIListener(listener net.Listener, apw WASIApplicationProtocolWrapper) *WASIListener {
@@ -65,9 +67,10 @@ func MakeWASIListener(listener net.Listener, apw WASIApplicationProtocolWrapper)
 	}
 
 	return &WASIListener{
-		listener:  listener,
-		apw:       apw,
-		mapFdConn: make(map[int32]net.Conn),
+		listener:        listener,
+		apw:             apw,
+		mapFdConn:       make(map[int32]net.Conn),
+		mapFdClonedFile: make(map[int32]*os.File),
 	}
 }
 
@@ -93,6 +96,9 @@ func (wl *WASIListener) accept(caller *wasmtime.Caller, applicationProtocol int3
 	}
 
 	wl.mapFdConn[int32(uintfd)] = conn // save the connection by its file descriptor
+	if GCFIX {
+		wl.mapFdClonedFile[int32(uintfd)] = connFile
+	}
 
 	return int32(uintfd), nil
 }
@@ -110,10 +116,27 @@ func (wl *WASIListener) GetConnByFd(fd int32) net.Conn {
 	return wl.mapFdConn[fd]
 }
 
+func (wl *WASIListener) GetFileByFd(fd int32) *os.File {
+	if wl.mapFdClonedFile == nil {
+		return nil
+	}
+	return wl.mapFdClonedFile[fd]
+}
+
 func (wl *WASIListener) CloseAllConn() {
+	if wl == nil {
+		return
+	}
+
 	if wl.mapFdConn != nil {
 		for _, conn := range wl.mapFdConn {
 			conn.Close()
+		}
+	}
+
+	if wl.mapFdClonedFile != nil {
+		for _, file := range wl.mapFdClonedFile {
+			file.Close()
 		}
 	}
 }
@@ -124,11 +147,12 @@ func (wl *WASIListener) CloseAllConn() {
 //
 // WASM module will (through WASI) call to the dialer to dial
 type WASIDialer struct {
-	network    string
-	address    string
-	dialerFunc func(network, address string) (net.Conn, error)
-	apw        WASIApplicationProtocolWrapper
-	mapFdConn  map[int32]net.Conn // saves all the connections created by this WasiDialer by their file descriptors!
+	network         string
+	address         string
+	dialerFunc      func(network, address string) (net.Conn, error)
+	apw             WASIApplicationProtocolWrapper
+	mapFdConn       map[int32]net.Conn // saves all the connections created by this WasiDialer by their file descriptors! (So we could close them when needed)
+	mapFdClonedFile map[int32]*os.File // saves all files so GC won't close them
 }
 
 func MakeWASIDialer(
@@ -141,11 +165,12 @@ func MakeWASIDialer(
 	}
 
 	return &WASIDialer{
-		network:    network,
-		address:    address,
-		dialerFunc: dialerFunc,
-		apw:        apw,
-		mapFdConn:  make(map[int32]net.Conn),
+		network:         network,
+		address:         address,
+		dialerFunc:      dialerFunc,
+		apw:             apw,
+		mapFdConn:       make(map[int32]net.Conn),
+		mapFdClonedFile: make(map[int32]*os.File),
 	}
 }
 
@@ -172,6 +197,9 @@ func (wd *WASIDialer) dial(caller *wasmtime.Caller, applicationProtocol int32) (
 	}
 
 	wd.mapFdConn[int32(uintfd)] = conn // save the connection by its file descriptor
+	if GCFIX {
+		wd.mapFdClonedFile[int32(uintfd)] = connFile
+	}
 
 	return int32(uintfd), nil
 }
@@ -183,10 +211,27 @@ func (wd *WASIDialer) GetConnByFd(fd int32) net.Conn {
 	return wd.mapFdConn[fd]
 }
 
+func (wd *WASIDialer) GetFileByFd(fd int32) *os.File {
+	if wd.mapFdClonedFile == nil {
+		return nil
+	}
+	return wd.mapFdClonedFile[fd]
+}
+
 func (wd *WASIDialer) CloseAllConn() {
+	if wd == nil {
+		return
+	}
+
 	if wd.mapFdConn != nil {
 		for _, conn := range wd.mapFdConn {
 			conn.Close()
+		}
+	}
+
+	if wd.mapFdClonedFile != nil {
+		for _, file := range wd.mapFdClonedFile {
+			file.Close()
 		}
 	}
 }

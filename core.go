@@ -41,6 +41,7 @@ func Core(config *Config) (c *runtimeCore, err error) {
 	wasiConfig, err = c.config.WASIConfigFactory.GetConfig()
 	if err != nil {
 		err = fmt.Errorf("water: (*WasiConfigFactory).GetConfig returned error: %w", err)
+		return
 	}
 
 	c.engine = wasmtime.NewEngine()

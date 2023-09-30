@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"runtime"
 	"time"
 
 	"github.com/bytecodealliance/wasmtime-go/v13"
@@ -27,7 +29,8 @@ const (
 type RuntimeConnV0 struct {
 	networkConn net.Conn // network-facing net.Conn, data written to this connection will be sent on the wire
 	uoConn      net.Conn // user-oriented net.Conn, user Read()/Write() to this connection
-	waConn      net.Conn // WASM-facing net.Conn, data written to this connection will be readable from user's end
+	woConn      net.Conn // WASM-facing net.Conn, data written to this connection will be readable from user's end
+	woConnFile  *os.File
 
 	core *runtimeCore
 
@@ -158,7 +161,7 @@ func (rcv *RuntimeConnV0) Write(b []byte) (n int, err error) {
 
 	n, err = rcv.uoConn.Write(b)
 	if err != nil {
-		return n, err
+		return n, fmt.Errorf("uoConn.Write: %w", err)
 	}
 
 	if n < len(b) {
@@ -198,9 +201,14 @@ func (rcv *RuntimeConnV0) Close() error {
 	}
 
 	rcv.core.wd.CloseAllConn()
+	rcv.core.wl.CloseAllConn()
 
-	if rcv.waConn != nil {
-		rcv.waConn.Close()
+	if rcv.woConnFile != nil {
+		rcv.woConnFile.Close()
+	}
+
+	if rcv.woConn != nil {
+		rcv.woConn.Close()
 	}
 
 	if rcv.uoConn != nil {
@@ -263,10 +271,17 @@ func (rcv *RuntimeConnV0) initializeRWConn() error {
 
 	// create a UnixConn pair
 	var err error
-	rcv.uoConn, rcv.waConn, err = socket.UnixConnPair("")
+	rcv.uoConn, rcv.woConn, err = socket.UnixConnPair("")
 	if err != nil {
 		return fmt.Errorf("socket.UnixConnPair returned error: %w", err)
 	}
+
+	// // create a TCPConn pair
+	// var err error
+	// rcv.uoConn, rcv.waConn, err = socket.TCPConnPair(":0")
+	// if err != nil {
+	// 	return fmt.Errorf("socket.TCPConnPair returned error: %w", err)
+	// }
 
 	return nil
 }
@@ -320,14 +335,34 @@ func (rcv *RuntimeConnV0) initializeOutboundConn() error {
 		return fmt.Errorf("WASM module missing required function _dial for V0")
 	}
 
+	// Dirty fix to bypass the No.4 fd corruption issue
+	if GCFIX {
+		// create dummy socket
+		dummy1, _, err := socket.UnixConnPair("")
+		if err != nil {
+			return fmt.Errorf("socket.UnixConnPair returned error: %w", err)
+		}
+
+		// push dummy socket to WASM
+		dummy1File, err := socket.AsFile(dummy1)
+		if err != nil {
+			return fmt.Errorf("socket.AsFile returned error: %w", err)
+		}
+		_, err = rcv.core.store.PushFile(dummy1File, wasmtime.READ_WRITE)
+		if err != nil {
+			return fmt.Errorf("(*wasmtime.Store).PushFile returned error: %w", err)
+		}
+	}
+
 	// push waConn to WASM
-	waConnFile, err := socket.AsFile(rcv.waConn)
+	woConnFile, err := socket.AsFile(rcv.woConn)
 	if err != nil {
 		return fmt.Errorf("socket.AsFile returned error: %w", err)
 	}
+	rcv.woConnFile = woConnFile
 
 	// push waConnFile to WASM
-	wasmFd, err := rcv.core.store.PushFile(waConnFile, wasmtime.READ_WRITE)
+	wasmFd, err := rcv.core.store.PushFile(woConnFile, wasmtime.READ_WRITE)
 	if err != nil {
 		return fmt.Errorf("(*wasmtime.Store).PushFile returned error: %w", err)
 	}
@@ -374,14 +409,33 @@ func (rcv *RuntimeConnV0) initializeInboundConn() error {
 		return fmt.Errorf("WASM module missing required function _accept for V0")
 	}
 
+	// Dirty fix to bypass the No.4 fd corruption issue
+	if GCFIX {
+		// create dummy socket
+		dummy1, _, err := socket.UnixConnPair("")
+		if err != nil {
+			return fmt.Errorf("socket.UnixConnPair returned error: %w", err)
+		}
+
+		// push dummy socket to WASM
+		dummy1File, err := socket.AsFile(dummy1)
+		if err != nil {
+			return fmt.Errorf("socket.AsFile returned error: %w", err)
+		}
+		_, err = rcv.core.store.PushFile(dummy1File, wasmtime.READ_WRITE)
+		if err != nil {
+			return fmt.Errorf("(*wasmtime.Store).PushFile returned error: %w", err)
+		}
+	}
+
 	// push waConn to WASM
-	waConnFile, err := socket.AsFile(rcv.waConn)
+	woConnFile, err := socket.AsFile(rcv.woConn)
 	if err != nil {
 		return fmt.Errorf("socket.AsFile returned error: %w", err)
 	}
 
 	// push waConnFile to WASM
-	wasmFd, err := rcv.core.store.PushFile(waConnFile, wasmtime.READ_WRITE)
+	wasmFd, err := rcv.core.store.PushFile(woConnFile, wasmtime.READ_WRITE)
 	if err != nil {
 		return fmt.Errorf("(*wasmtime.Store).PushFile returned error: %w", err)
 	}
@@ -403,6 +457,9 @@ func (rcv *RuntimeConnV0) initializeInboundConn() error {
 	} else { // error code returned
 		return WASMErr(netFdInt32)
 	}
+
+	// keep waConnFile from GC
+	rcv.woConnFile = woConnFile
 
 	return nil
 }
@@ -439,4 +496,9 @@ func (rcv *RuntimeConnV0) initializeRelayingConn() error {
 	} else {
 		return WASMErr(ret32)
 	}
+}
+
+func (rcv *RuntimeConnV0) WAConnFile() *os.File {
+	runtime.KeepAlive(rcv.woConnFile)
+	return rcv.woConnFile
 }
