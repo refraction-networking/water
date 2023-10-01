@@ -3,6 +3,8 @@ package water
 type Feature uint64
 
 // Feature is a bit mask of experimental features of WATER.
+//
+// TODO: implement Feature.
 const (
 	FEATURE_DUMMY    Feature = 1 << iota // a dummy feature that does nothing.
 	FEATURE_RESERVED                     // reserved for future use

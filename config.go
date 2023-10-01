@@ -10,7 +10,7 @@ type Config struct {
 	// around a given net.Conn to provide out of box application
 	// protocol support, such as TLS.
 	//
-	// TODO: implement this feature
+	// TODO: decide either we keep this or not
 	WASIApplicationProtocolWrapper WASIApplicationProtocolWrapper
 
 	// EmbedDialer provides a dialer func that dials a remote
@@ -72,6 +72,7 @@ type WAConfig struct {
 	FilePath string // Path to the config file.
 }
 
+// File opens the config file and returns the file descriptor.
 func (c *WAConfig) File() *os.File {
 	if c.FilePath == "" {
 		return nil

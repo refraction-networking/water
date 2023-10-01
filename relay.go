@@ -24,7 +24,6 @@ package water
 // once it is started.
 //
 // The WASM module used by a Server must implement a WASMDialer.
+//
+// TODO: implement Relay
 type Relay struct{}
-
-/// TODO: Server will NOT be implemented without WASI multi-threading
-/// support or blocking loop support.

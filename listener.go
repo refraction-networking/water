@@ -34,6 +34,13 @@ type Listener struct {
 	closed *atomic.Bool
 }
 
+// ListenConfig listens on the network address and returns a Listener
+// configured with the given Config.
+//
+// This is the recommended way to create a Listener, unless there are
+// other requirements such as supplying a custom net.Listener. In that
+// case, a Listener could be created with NewListener() with a Config
+// specifying a custom net.Listener.
 func ListenConfig(network, address string, config *Config) (net.Listener, error) {
 	lis, err := net.Listen(network, address)
 	if err != nil {
@@ -47,6 +54,23 @@ func ListenConfig(network, address string, config *Config) (net.Listener, error)
 	}, nil
 }
 
+// NewListener creates a Listener with the given Config.
+//
+// The Config must specify a custom net.Listener, otherwise the
+// Accept() method will fail.
+func NewListener(config *Config) *Listener {
+	return &Listener{
+		Config: config,
+		closed: new(atomic.Bool),
+	}
+}
+
+// Accept waits for and returns the next connection after processing
+// the data with the WASM module.
+//
+// The returned net.Conn implements net.Conn and could be seen as
+// the inbound connection with a wrapping transport protocol handled
+// by the WASM module.
 func (l *Listener) Accept() (net.Conn, error) {
 	if l.closed.Load() {
 		return nil, fmt.Errorf("water: listener is closed")

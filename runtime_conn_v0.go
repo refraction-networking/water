@@ -8,11 +8,10 @@ import (
 	"io"
 	"net"
 	"os"
-	"runtime"
 	"time"
 
 	"github.com/bytecodealliance/wasmtime-go/v13"
-	"github.com/gaukas/water/socket"
+	"github.com/gaukas/water/internal/socket"
 )
 
 func init() {
@@ -96,6 +95,10 @@ type RuntimeConnV0 struct {
 	_read *wasmtime.Func // _read() (err int32)
 }
 
+// NewOutboundRuntimeConnV0 creates a new RuntimeConnV0 for outbound connections
+// using the given runtimeCore.
+//
+// Used by Dial().
 func NewOutboundRuntimeConnV0(core *runtimeCore) (RuntimeConn, error) {
 	rc := &RuntimeConnV0{core: core}
 	err := rc.initializeOutboundConn()
@@ -106,6 +109,10 @@ func NewOutboundRuntimeConnV0(core *runtimeCore) (RuntimeConn, error) {
 	return rc, nil
 }
 
+// NewInboundRuntimeConnV0 creates a new RuntimeConnV0 for inbound connections
+// using the given runtimeCore.
+//
+// Used by Listener.Accept().
 func NewInboundRuntimeConnV0(core *runtimeCore) (RuntimeConn, error) {
 	rc := &RuntimeConnV0{core: core}
 	err := rc.initializeInboundConn()
@@ -116,6 +123,10 @@ func NewInboundRuntimeConnV0(core *runtimeCore) (RuntimeConn, error) {
 	return rc, nil
 }
 
+// NewRelayingRuntimeConnV0 creates a new RuntimeConnV0 for relaying connections
+// using the given runtimeCore.
+//
+// TODO: use this for Relay.
 func NewRelayingRuntimeConnV0(core *runtimeCore) (RuntimeConn, error) {
 	rc := &RuntimeConnV0{core: core}
 	err := rc.initializeRelayingConn()
@@ -302,7 +313,7 @@ func (rcv *RuntimeConnV0) pushConfig() error {
 	}
 
 	// push WAConfig
-	configFd, err := rcv.core.store.PushFile(rcv.core.config.WAConfig.File(), wasmtime.READ_ONLY)
+	configFd, err := rcv.core.store.PushFile(rcv.core.Config().WAConfig.File(), wasmtime.READ_ONLY)
 	if err != nil {
 		return fmt.Errorf("(*wasmtime.Store).PushFile returned error: %w", err)
 	}
@@ -498,7 +509,7 @@ func (rcv *RuntimeConnV0) initializeRelayingConn() error {
 	}
 }
 
-func (rcv *RuntimeConnV0) WAConnFile() *os.File {
-	runtime.KeepAlive(rcv.woConnFile)
-	return rcv.woConnFile
-}
+// func (rcv *RuntimeConnV0) WAConnFile() *os.File {
+// 	runtime.KeepAlive(rcv.woConnFile)
+// 	return rcv.woConnFile
+// }

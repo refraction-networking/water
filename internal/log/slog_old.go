@@ -1,11 +1,11 @@
-//go:build go1.21
+//go:build !go1.21
 
-package debugging
+package log
 
 import (
 	"fmt"
 
-	"log/slog"
+	"golang.org/x/exp/slog"
 )
 
 func Debugf(format string, args ...any) {
@@ -16,7 +16,7 @@ func Infof(format string, args ...any) {
 	slog.Default().Info(fmt.Sprintf(format, args...))
 }
 
-func Warningf(format string, args ...any) {
+func Warnf(format string, args ...any) {
 	slog.Default().Warn(fmt.Sprintf(format, args...))
 }
 

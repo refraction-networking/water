@@ -1,11 +1,11 @@
-//go:build !go1.21
+//go:build go1.21
 
-package debugging
+package log
 
 import (
 	"fmt"
 
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 func Debugf(format string, args ...any) {

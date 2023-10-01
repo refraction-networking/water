@@ -18,10 +18,15 @@ const (
 	WASI_AP_TLS_SERVER
 )
 
+// WASIApplicationProtocolWrapper is an interface for a wrapper
+// that wraps a net.Conn with an application protocol.
 type WASIApplicationProtocolWrapper interface {
 	Wrap(WASIApplicationProtocol, net.Conn) (net.Conn, error)
 }
 
+// noWASIApplicationProtocolWrapper is a WASIApplicationProtocolWrapper
+// that does not wrap the net.Conn with any application protocol.
+// In other words, it returns the net.Conn as is.
 type noWASIApplicationProtocolWrapper struct{}
 
 func (noWASIApplicationProtocolWrapper) Wrap(ap WASIApplicationProtocol, conn net.Conn) (net.Conn, error) {
@@ -32,4 +37,4 @@ func (noWASIApplicationProtocolWrapper) Wrap(ap WASIApplicationProtocol, conn ne
 }
 
 // TODO: implement defaultWASIApplicationProtocolWrapper to support a few
-// popular application protocols.
+// popular application protocols, OR completely get rid of this feature.

@@ -31,6 +31,8 @@ type runtimeCore struct {
 	wl *WASIListener
 }
 
+// Core creates a new runtimeCore, which is the base of all
+// WASM runtime functionalities.
 func Core(config *Config) (c *runtimeCore, err error) {
 	c = &runtimeCore{
 		config:     config,
@@ -62,18 +64,28 @@ func Core(config *Config) (c *runtimeCore, err error) {
 	return
 }
 
+// Config returns the Config used to create the runtimeCore.
 func (c *runtimeCore) Config() *Config {
 	return c.config
 }
 
+// WASIDialer returns the WASIDialer linked to the runtimeCore.
+//
+// If no WASIDialer is linked, nil is returned.
 func (c *runtimeCore) WASIDialer() *WASIDialer {
 	return c.wd
 }
 
+// WASIListener returns the WASIListener linked to the runtimeCore.
+//
+// If no WASIListener is linked, nil is returned.
 func (c *runtimeCore) WASIListener() *WASIListener {
 	return c.wl
 }
 
+// DeferFunc adds a defer function to the runtimeCore.
+//
+// All deferred functions will be called when the WASM module exits.
 func (c *runtimeCore) DeferFunc(f func()) {
 	c.deferFuncs = append(c.deferFuncs, f)
 }
@@ -99,6 +111,10 @@ func (c *runtimeCore) linkExecDeferredFunc() error {
 	return nil
 }
 
+// LinkNetworkInterface links the WASI Dialer and WASI Listener to the runtimeCore.
+//
+// The WASI Dialer must be linked for a dialer WASM module, and the WASI Listener
+// must be linked for a listener WASM module.
 func (c *runtimeCore) LinkNetworkInterface(dialer *WASIDialer, listener *WASIListener) error {
 	if c.linker == nil {
 		return fmt.Errorf("water: linker not set, is runtimeCore initialized?")
@@ -130,6 +146,9 @@ func (c *runtimeCore) LinkNetworkInterface(dialer *WASIDialer, listener *WASILis
 	return nil
 }
 
+// Initialize initializes the runtimeCore.
+//
+// A runtimeCore must be initialized before it can be used by a dialer/listener/relay.
 func (c *runtimeCore) Initialize() (err error) {
 	err = c.linkExecDeferredFunc()
 	if err != nil {
@@ -163,6 +182,11 @@ func (c *runtimeCore) Initialize() (err error) {
 	return nil
 }
 
+// OutboundRuntimeConn returns a RuntimeConn representing an outbound connection
+// by treating the runtimeCore as a dialer WASM module based on the version
+// of the WASM module.
+//
+// This function is only valid for a dialer WASM module.
 func (c *runtimeCore) OutboundRuntimeConn() (RuntimeConn, error) {
 	// get version
 	// In a _version() call, the WASM module will return its version
@@ -177,6 +201,9 @@ func (c *runtimeCore) OutboundRuntimeConn() (RuntimeConn, error) {
 	}
 }
 
+// InboundRuntimeConn returns a RuntimeConn representing an inbound connection
+// by treating the runtimeCore as a listener WASM module based on the version
+// of the WASM module.
 func (c *runtimeCore) InboundRuntimeConn() (RuntimeConn, error) {
 	// get version
 	// In a _version() call, the WASM module will return its version
@@ -191,12 +218,14 @@ func (c *runtimeCore) InboundRuntimeConn() (RuntimeConn, error) {
 	}
 }
 
+// execDeferredFunc executes all deferred functions.
 func (c *runtimeCore) execDeferredFunc() {
 	for _, f := range c.deferFuncs {
 		f()
 	}
 }
 
+// linkWASIDialFunc links a WASI dial function to the runtimeCore.
 func (c *runtimeCore) linkWASIDialFunc(f WASIConnectFunc) error {
 	err := c.linker.FuncNew("env", "dialh", WASIConnectFuncType, WrapWASIConnectFunc(f))
 	if err != nil {
@@ -205,10 +234,14 @@ func (c *runtimeCore) linkWASIDialFunc(f WASIConnectFunc) error {
 	return nil
 }
 
+// linkNOPWASIDialFunc links a NOP WASI dial function to the runtimeCore.
+//
+// Dialing will always fail with an error.
 func (c *runtimeCore) linkNOPWASIDialFunc() error {
 	return c.linkWASIDialFunc(nopWASIConnectFunc)
 }
 
+// linkWASIAcceptFunc links a WASI accept function to the runtimeCore.
 func (c *runtimeCore) linkWASIAcceptFunc(f WASIConnectFunc) error {
 	err := c.linker.FuncNew("env", "accepth", WASIConnectFuncType, WrapWASIConnectFunc(f))
 	if err != nil {
@@ -217,6 +250,9 @@ func (c *runtimeCore) linkWASIAcceptFunc(f WASIConnectFunc) error {
 	return nil
 }
 
+// linkNOPWASIAcceptFunc links a NOP WASI accept function to the runtimeCore.
+//
+// Accepting will always fail with an error.
 func (c *runtimeCore) linkNOPWASIAcceptFunc() error {
 	return c.linkWASIAcceptFunc(nopWASIConnectFunc)
 }

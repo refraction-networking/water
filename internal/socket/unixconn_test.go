@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gaukas/water/socket"
+	"github.com/gaukas/water/internal/socket"
 )
 
 func TestUnixConnPair(t *testing.T) {

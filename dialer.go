@@ -22,10 +22,23 @@ type Dialer struct {
 	Config *Config
 }
 
+// Dialer dials the given network address using the specified dialer
+// in the config. The returned RuntimeConn implements net.Conn and
+// could be seen as the outbound connection with a wrapping transport
+// protocol handled by the WASM module.
+//
+// Internally, DialContext() is called with a background context.
 func (d *Dialer) Dial(network, address string) (RuntimeConn, error) {
 	return d.DialContext(context.Background(), network, address)
 }
 
+// DialContext dials the given network address using the specified dialer
+// in the config. The returned RuntimeConn implements net.Conn and
+// could be seen as the outbound connection with a wrapping transport
+// protocol handled by the WASM module.
+//
+// If the context expires before the connection is complete, an error is
+// returned.
 func (d *Dialer) DialContext(ctx context.Context, network, address string) (rConn RuntimeConn, err error) {
 	if d.Config == nil {
 		return nil, fmt.Errorf("water: dialing with nil config is not allowed")

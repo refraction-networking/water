@@ -2,9 +2,10 @@ package water
 
 import "fmt"
 
+// WASMErrCode is the error code returned by the wasm module
 type WASMErrCode = int32
 
-// WASMErrCode
+// Pre-defined WASMErrCode
 const (
 	NO_ERROR WASMErrCode = -iota
 	GENERAL_ERROR
@@ -17,6 +18,7 @@ const (
 	NOT_INITIALIZED
 )
 
+// Pre-defined WASM Errors
 var (
 	ErrGeneralError    = fmt.Errorf("general error")
 	ErrInvalidArgument = fmt.Errorf("invalid argument")
@@ -40,6 +42,7 @@ var mapWASMErrCode = map[WASMErrCode]error{
 	NOT_INITIALIZED:  ErrNotInitialized,
 }
 
+// WASMErr returns the error corresponding to the WASM error code.
 func WASMErr(code WASMErrCode) error {
 	if err, ok := mapWASMErrCode[code]; ok {
 		return err

@@ -75,42 +75,28 @@ func testDialerV0(t *testing.T) {
 		t.Fatal(goroutineErr)
 	}
 
-	rcv := rConn.(*water.RuntimeConnV0)
-	err = rcv.WAConnFile().Sync()
-	t.Logf("Sync before GC: %v", err)
-	// err = rcv.WAConnFile2().Sync()
-	// t.Logf("Sync2 before GC: %v", err)
-
 	runtime.GC()
-	time.Sleep(1 * time.Second)
-
-	err = rcv.WAConnFile().Sync()
-	t.Logf("Sync after GC: %v", err)
-	// err = rcv.WAConnFile2().Sync()
-	// t.Logf("Sync2 after GC: %v", err)
+	time.Sleep(100 * time.Millisecond)
 
 	if err = testUppercaseHexencoderConn(rConn, lisConn, []byte("hello"), []byte("world")); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("testUppercaseHexencoderConn#1 passed")
 
 	runtime.GC()
-	time.Sleep(2 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 
 	if err = testUppercaseHexencoderConn(rConn, lisConn, []byte("i'm dialer"), []byte("hello dialer")); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("testUppercaseHexencoderConn#2 passed")
 
 	runtime.GC()
-	time.Sleep(3 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 
 	if err = testUppercaseHexencoderConn(rConn, lisConn, []byte("who are you?"), []byte("I'm listener")); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("testUppercaseHexencoderConn#3 passed")
 
-	if err = testIO(rConn, lisConn, 10000, 512, 10*time.Microsecond); err != nil {
+	if err = testIO(rConn, lisConn, 10000, 512, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -156,16 +142,29 @@ func testListenerV0(t *testing.T) {
 		t.Fatal(goroutineErr)
 	}
 
+	runtime.GC()
+	time.Sleep(100 * time.Millisecond)
+
 	if err = testLowercaseHexencoderConn(rConn, dialConn, []byte("hello"), []byte("world")); err != nil {
 		t.Error(err)
 	}
+
+	runtime.GC()
+	time.Sleep(100 * time.Millisecond)
 
 	if err = testLowercaseHexencoderConn(rConn, dialConn, []byte("i'm listener"), []byte("hello listener")); err != nil {
 		t.Error(err)
 	}
 
+	runtime.GC()
+	time.Sleep(100 * time.Millisecond)
+
 	if err = testLowercaseHexencoderConn(rConn, dialConn, []byte("who are you?"), []byte("I'm dialer")); err != nil {
 		t.Error(err)
+	}
+
+	if err = testIO(rConn, dialConn, 10000, 512, 0); err != nil {
+		t.Fatal(err)
 	}
 }
 

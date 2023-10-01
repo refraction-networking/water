@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/bytecodealliance/wasmtime-go/v13"
-	"github.com/gaukas/water/socket"
+	"github.com/gaukas/water/internal/socket"
 )
 
 type wasmtimeStoreIndependentFunction = func(*wasmtime.Caller, []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap)
@@ -146,6 +146,7 @@ func (wl *WASIListener) CloseAllConn() {
 // a single network.
 //
 // WASM module will (through WASI) call to the dialer to dial
+// for network connections.
 type WASIDialer struct {
 	network         string
 	address         string

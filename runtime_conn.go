@@ -26,6 +26,8 @@ func OutboundRuntimeConnWithVersion(core *runtimeCore, version int32) (RuntimeCo
 	}
 }
 
+// RegisterOutboundRuntimeConnWithVersion registers a function that spins up a RuntimeConn of the
+// corresponding version with the given core and (implicitly) initializes it.
 func RegisterOutboundRuntimeConnWithVersion(version int32, f func(*runtimeCore) (RuntimeConn, error)) {
 	if _, ok := mapOBRCV[version]; ok {
 		panic(fmt.Sprintf("water: version %d already registered", version))
@@ -43,6 +45,8 @@ func InboundRuntimeConnWithVersion(core *runtimeCore, version int32) (RuntimeCon
 	}
 }
 
+// RegisterInboundRuntimeConnWithVersion registers a function that spins up a RuntimeConn of the
+// corresponding version with the given core and (implicitly) initializes it.
 func RegisterInboundRuntimeConnWithVersion(version int32, f func(*runtimeCore) (RuntimeConn, error)) {
 	if _, ok := mapIBRCV[version]; ok {
 		panic(fmt.Sprintf("water: version %d already registered", version))
@@ -60,6 +64,8 @@ func RelayingRuntimeConnWithVersion(core *runtimeCore, version int32) (RuntimeCo
 	}
 }
 
+// RegisterRelayingRuntimeConnWithVersion registers a function that spins up a RuntimeConn of the
+// corresponding version with the given core and (implicitly) initializes it.
 func RegisterRelayingRuntimeConnWithVersion(version int32, f func(*runtimeCore) (RuntimeConn, error)) {
 	if _, ok := mapRLRCV[version]; ok {
 		panic(fmt.Sprintf("water: version %d already registered", version))
