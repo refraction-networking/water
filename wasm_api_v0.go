@@ -19,11 +19,7 @@ import (
 type WASMv0 struct {
 	*core
 
-	_init *wasmtime.Func // _init()
-
-	// `_config` is a WASM-exported function, in which WASM reads the config file
-	// at the file descriptor specified by the first parameter.
-	_config *wasmtime.Func // _config(fd i32)
+	_init *wasmtime.Func // _init() -> i32
 
 	// _dial:
 	//  - Calls to `env.dialh(apw) -> fd i32` to dial a network connection (wrapped with the
@@ -99,27 +95,29 @@ func NewWASMv0(core *core) *WASMv0 {
 }
 
 func (w *WASMv0) LinkNetworkInterface(dialer *v0.WASIDialer, listener *v0.WASIListener) error {
-	if w.linker == nil {
+	if w.Linker() == nil {
 		return fmt.Errorf("water: linker not set, is Core initialized?")
 	}
 
+	// import host_dial
 	if dialer != nil {
-		if err := w.linker.FuncNew("env", "dialh", v0.WASIConnectFuncType, dialer.WrappedDial()); err != nil {
+		if err := w.Linker().FuncNew("env", "host_dial", v0.WASIConnectFuncType, dialer.WrappedDial()); err != nil {
 			return fmt.Errorf("water: linking WASI dialer, (*wasmtime.Linker).FuncNew: %w", err)
 		}
 	} else {
-		if err := w.linker.FuncNew("env", "dialh", v0.WASIConnectFuncType, v0.WrappedNopWASIConnectFunc()); err != nil {
+		if err := w.Linker().FuncNew("env", "host_dial", v0.WASIConnectFuncType, v0.WrappedNopWASIConnectFunc()); err != nil {
 			return fmt.Errorf("water: linking NOP dialer, (*wasmtime.Linker).FuncNew: %w", err)
 		}
 	}
 	w.dialer = dialer
 
+	// import host_accept
 	if listener != nil {
-		if err := w.linker.FuncNew("env", "accepth", v0.WASIConnectFuncType, listener.WrappedAccept()); err != nil {
+		if err := w.Linker().FuncNew("env", "host_accept", v0.WASIConnectFuncType, listener.WrappedAccept()); err != nil {
 			return fmt.Errorf("water: linking WASI listener, (*wasmtime.Linker).FuncNew: %w", err)
 		}
 	} else {
-		if err := w.linker.FuncNew("env", "accepth", v0.WASIConnectFuncType, v0.WrappedNopWASIConnectFunc()); err != nil {
+		if err := w.Linker().FuncNew("env", "host_accept", v0.WASIConnectFuncType, v0.WrappedNopWASIConnectFunc()); err != nil {
 			return fmt.Errorf("water: linking NOP listener, (*wasmtime.Linker).FuncNew: %w", err)
 		}
 	}
@@ -138,11 +136,16 @@ func (w *WASMv0) Initialize() error {
 	}
 
 	var err error
-	// import deferh function
-	if err = w.linker.FuncWrap("env", "deferh", func() {
+	// import host_defer function
+	if err = w.Linker().FuncWrap("env", "host_defer", func() {
 		w.DeferAll()
 	}); err != nil {
 		return fmt.Errorf("water: linking deferh function, (*wasmtime.Linker).FuncWrap: %w", err)
+	}
+
+	// import pull_config function (it is called pushConfig here in the host)
+	if err := w.Linker().FuncNew("env", "pull_config", v0.WASIConnectFuncType, v0.WrapConnectFunc(w.pushConfig)); err != nil {
+		return fmt.Errorf("water: linking pull_config function, (*wasmtime.Linker).FuncNew: %w", err)
 	}
 
 	// instantiate the WASM module
@@ -154,12 +157,6 @@ func (w *WASMv0) Initialize() error {
 	w._init = w.Instance().GetFunc(w.Store(), "_init")
 	if w._init == nil {
 		return fmt.Errorf("water: WASM module does not export _init")
-	}
-
-	// _config
-	w._config = w.Instance().GetFunc(w.Store(), "_config")
-	if w._config == nil {
-		return fmt.Errorf("water: WASM module does not export _config")
 	}
 
 	// _dial
@@ -180,17 +177,12 @@ func (w *WASMv0) Initialize() error {
 		return fmt.Errorf("water: WASM module does not export _close")
 	}
 
-	// push file to WASM
-	configFd, err := w.Store().PushFile(w.Config().WAConfig.File(), wasmtime.READ_ONLY)
+	// call _init
+	ret, err := w._init.Call(w.Store())
 	if err != nil {
-		return fmt.Errorf("water: pushing config file to store failed: %w", err)
+		return fmt.Errorf("water: calling _init function returned error: %w", err)
 	}
 
-	// config WASM instance
-	ret, err := w._config.Call(w.Store(), int32(configFd))
-	if err != nil {
-		return fmt.Errorf("water: calling _config function returned error: %w", err)
-	}
 	return wasm.WASMErr(ret.(int32))
 }
 
@@ -354,4 +346,14 @@ func (w *WASMv0) Cleanup() {
 
 	w.dialer.CloseAllConn()
 	w.listener.CloseAllConn()
+}
+
+func (w *WASMv0) pushConfig(caller *wasmtime.Caller) (int32, error) {
+	// push file to WASM
+	configFd, err := caller.PushFile(w.Config().WATMConfig.File(), wasmtime.READ_ONLY)
+	if err != nil {
+		return wasm.INVALID_FD, err
+	}
+
+	return int32(configFd), nil
 }

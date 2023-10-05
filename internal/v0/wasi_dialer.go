@@ -38,7 +38,7 @@ func MakeWASIDialer(
 }
 
 func (wd *WASIDialer) WrappedDial() wasm.WASMTIMEStoreIndependentFunction {
-	return wrapConnectFunc(wd.dial)
+	return WrapConnectFunc(wd.dial)
 }
 
 // dial(apw i32) -> fd i32

@@ -43,8 +43,6 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (conn
 	if d.Config == nil {
 		return nil, fmt.Errorf("water: dialing with nil config is not allowed")
 	}
-	d.Config.embedDialerOrDefault()
-	d.Config.mustSetWABin()
 
 	ctxReady, dialReady := context.WithCancel(context.Background())
 	go func() {

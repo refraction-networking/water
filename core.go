@@ -18,7 +18,7 @@ type core struct {
 	// wasmtime
 	engine   *wasmtime.Engine
 	module   *wasmtime.Module
-	store    *wasmtime.Store
+	store    *wasmtime.Store // avoid directly accessing store once the instance is created
 	linker   *wasmtime.Linker
 	instance *wasmtime.Instance
 }
@@ -38,7 +38,7 @@ func Core(config *Config) (c *core, err error) {
 	}
 
 	c.engine = wasmtime.NewEngine()
-	c.module, err = wasmtime.NewModule(c.engine, c.config.WABin)
+	c.module, err = wasmtime.NewModule(c.engine, c.config.WATMBinOrPanic())
 	if err != nil {
 		err = fmt.Errorf("water: wasmtime.NewModule returned error: %w", err)
 		return

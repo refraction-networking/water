@@ -46,7 +46,7 @@ func (c *Config) Listen(network, address string) (net.Listener, error) {
 	}
 
 	config := c.Clone()
-	config.EmbedListener = lis
+	config.NetworkListener = lis
 
 	return &Listener{
 		Config: config,
@@ -81,8 +81,6 @@ func (l *Listener) Accept() (net.Conn, error) {
 	if l.Config == nil {
 		return nil, fmt.Errorf("water: dialing with nil config is not allowed")
 	}
-	l.Config.mustEmbedListener()
-	l.Config.mustSetWABin()
 
 	var core *core
 	var err error
@@ -99,7 +97,7 @@ func (l *Listener) Accept() (net.Conn, error) {
 // Implements net.Listener.
 func (l *Listener) Close() error {
 	if l.closed.CompareAndSwap(false, true) {
-		return l.Config.EmbedListener.Close()
+		return l.Config.NetworkListener.Close()
 	}
 	return nil
 }
@@ -108,5 +106,5 @@ func (l *Listener) Close() error {
 //
 // Implements net.Listener.
 func (l *Listener) Addr() net.Addr {
-	return l.Config.EmbedListener.Addr()
+	return l.Config.NetworkListener.Addr()
 }

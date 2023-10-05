@@ -1,4 +1,4 @@
-//go:build unix && !windows && !nov0
+// no //go:build unix && !windows && !nov0
 
 package water_test
 
@@ -55,8 +55,8 @@ func testDialerV0(t *testing.T) {
 	// Dial
 	dialer := &water.Dialer{
 		Config: &water.Config{
-			WABin: hexencoder_v0,
-			WAConfig: water.WAConfig{
+			WATMBin: hexencoder_v0,
+			WATMConfig: water.WATMConfig{
 				FilePath: "./testdata/hexencoder_v0.dialer.json",
 			},
 			WASIConfigFactory: wasm.NewWasiConfigFactory(),
@@ -107,8 +107,8 @@ func testListenerV0(t *testing.T) {
 
 	// prepare for listener
 	config := &water.Config{
-		WABin: hexencoder_v0,
-		WAConfig: water.WAConfig{
+		WATMBin: hexencoder_v0,
+		WATMConfig: water.WATMConfig{
 			FilePath: "./testdata/hexencoder_v0.listener.json",
 		},
 		WASIConfigFactory: wasm.NewWasiConfigFactory(),
@@ -346,8 +346,8 @@ func benchmarkDialerV0(b *testing.B) {
 	// Dial
 	dialer := &water.Dialer{
 		Config: &water.Config{
-			WABin: hexencoder_v0,
-			WAConfig: water.WAConfig{
+			WATMBin: hexencoder_v0,
+			WATMConfig: water.WATMConfig{
 				FilePath: "./testdata/hexencoder_v0.dialer.json",
 			},
 			WASIConfigFactory: wasm.NewWasiConfigFactory(),

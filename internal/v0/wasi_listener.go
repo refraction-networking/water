@@ -29,7 +29,7 @@ func MakeWASIListener(listener net.Listener) *WASIListener {
 }
 
 func (wl *WASIListener) WrappedAccept() wasm.WASMTIMEStoreIndependentFunction {
-	return wrapConnectFunc(wl.accept)
+	return WrapConnectFunc(wl.accept)
 }
 
 func (wl *WASIListener) accept(caller *wasmtime.Caller) (fd int32, err error) {

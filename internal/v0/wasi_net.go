@@ -16,15 +16,15 @@ var WASIConnectFuncType *wasmtime.FuncType = wasmtime.NewFuncType(
 	},
 )
 
-func wrapConnectFunc(f WASIConnectFunc) wasm.WASMTIMEStoreIndependentFunction {
+func WrapConnectFunc(f WASIConnectFunc) wasm.WASMTIMEStoreIndependentFunction {
 	return func(caller *wasmtime.Caller, vals []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
 		if len(vals) != 0 {
-			return []wasmtime.Val{wasmtime.ValI32(wasm.INVALID_ARGUMENT)}, wasmtime.NewTrap(fmt.Sprintf("(*WASIDialer).dial expects 0 argument, got %d", len(vals)))
+			return []wasmtime.Val{wasmtime.ValI32(wasm.INVALID_ARGUMENT)}, wasmtime.NewTrap(fmt.Sprintf("v0.WASIConnectFunc expects 0 argument, got %d", len(vals)))
 		}
 
 		fd, err := f(caller)
-		if err != nil { // here fd is actually an error code (negative)
-			return []wasmtime.Val{wasmtime.ValI32(fd)}, wasmtime.NewTrap(fmt.Sprintf("(*WASIDialer).dial: %v", err))
+		if err != nil { // here fd is expected to be an error code (negative)
+			return []wasmtime.Val{wasmtime.ValI32(fd)}, wasmtime.NewTrap(fmt.Sprintf("v0.WASIConnectFunc: %v", err))
 		}
 
 		return []wasmtime.Val{wasmtime.ValI32(fd)}, nil
@@ -32,7 +32,7 @@ func wrapConnectFunc(f WASIConnectFunc) wasm.WASMTIMEStoreIndependentFunction {
 }
 
 func WrappedNopWASIConnectFunc() wasm.WASMTIMEStoreIndependentFunction {
-	return wrapConnectFunc(nopWASIConnectFunc)
+	return WrapConnectFunc(nopWASIConnectFunc)
 }
 
 // nopWASIConnectFunc is a WASIConnectFunc that does nothing.

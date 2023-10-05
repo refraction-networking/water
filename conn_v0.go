@@ -41,7 +41,7 @@ func DialV0(core *core, network, address string) (c Conn, err error) {
 		wasm: wasm,
 	}
 
-	dialer := v0.MakeWASIDialer(network, address, core.config.EmbedDialer)
+	dialer := v0.MakeWASIDialer(network, address, core.Config().DialerFuncOrDefault())
 
 	if err = conn.wasm.LinkNetworkInterface(dialer, nil); err != nil {
 		return nil, err
@@ -80,7 +80,7 @@ func AcceptV0(core *core) (c Conn, err error) {
 		wasm: wasm,
 	}
 
-	listener := v0.MakeWASIListener(core.config.EmbedListener)
+	listener := v0.MakeWASIListener(core.Config().NetworkListenerOrPanic())
 
 	if err = conn.wasm.LinkNetworkInterface(nil, listener); err != nil {
 		return nil, err

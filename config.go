@@ -8,39 +8,42 @@ import (
 )
 
 type Config struct {
-	// EmbedDialer provides a dialer func that dials a remote
-	// network address. It enables the configured Dialer/Relay
-	// to dial a network address for the WASM module.
-	//
-	// If not specified, a default dialer func will be used.
-	EmbedDialer func(network, address string) (net.Conn, error)
+	// WATMBin contains the binary format of the WebAssembly Transport Module.
+	// In a typical use case, this mandatory field is populated by loading
+	// from a .wasm file, downloaded from a remote target, or generated from
+	// a .wat (WebAssembly Text Format) file.
+	WATMBin []byte
 
-	// NetworkListener points to a listener that listens on a
-	// network address. It will be used to provide incoming
-	// network connections to the WASM instance. Required by
+	// DialerFunc specifies a func that dials the specified address on the
+	// named network. This optional field can be set to override the Go
+	// default dialer func:
+	// 	net.Dial(network, address)
+	DialerFunc func(network, address string) (net.Conn, error)
+
+	// NetworkListener specifies a net.listener implementation that listens
+	// on the specified address on the named network. This optional field
+	// will be used to provide (incoming) network connections from a
+	// presumably remote source to the WASM instance. Required by
 	// ListenConfig().
-	EmbedListener net.Listener
+	NetworkListener net.Listener
 
-	// Feature specifies a series of experimental features to enable
-	// for the WASM runtime.
+	// Feature specifies a series of experimental features for the WASM
+	// runtime.
 	//
-	// Feature flag is bit-masked and version-dependent. That is, a
+	// Each feature flag is bit-masked and version-dependent, and flags
+	// are independent of each other. This means that a particular
 	// feature flag may be supported in one version of the runtime but
-	// not in another. If a feature flag is not supported in the runtime,
-	// it will be ignored.
+	// not in another. If a feature flag is not supported or not recognized
+	// by the runtime, it will be silently ignored.
 	Feature Feature
 
-	// WABin is the WebAssembly module binary. In a typical use case, this
-	// field is populated by reading in a .wasm file.
-	//
-	// This field is required.
-	WABin []byte
+	// WATMConfig optionally provides a configuration file to be pushed into
+	// the WASM Transport Module.
+	WATMConfig WATMConfig
 
-	// WAConfig defines the configuration file to be pushed into the WASM module.
-	WAConfig WAConfig
-
-	// WasiConfigFactory is used to replicate the WASI config
-	// for each WASM instance created.
+	// WasiConfigFactory is used to replicate the WASI config for each WASM
+	// instance created. This field is for advanced use cases and/or debugging
+	// purposes only.
 	WASIConfigFactory *wasm.WASIConfigFactory
 }
 
@@ -49,44 +52,50 @@ func (c *Config) Clone() *Config {
 		return nil
 	}
 
-	WABinClone := make([]byte, len(c.WABin))
-	copy(WABinClone, c.WABin)
+	wasmClone := make([]byte, len(c.WATMBin))
+	copy(wasmClone, c.WATMBin)
 
 	return &Config{
-		EmbedDialer:       c.EmbedDialer,
-		EmbedListener:     c.EmbedListener,
+		WATMBin:           c.WATMBin,
+		DialerFunc:        c.DialerFunc,
+		NetworkListener:   c.NetworkListener,
 		Feature:           c.Feature,
-		WABin:             WABinClone,
-		WAConfig:          c.WAConfig,
+		WATMConfig:        c.WATMConfig,
 		WASIConfigFactory: c.WASIConfigFactory.Clone(),
 	}
 }
 
-func (c *Config) embedDialerOrDefault() {
-	if c.EmbedDialer == nil {
-		c.EmbedDialer = net.Dial
+func (c *Config) DialerFuncOrDefault() func(network, address string) (net.Conn, error) {
+	if c.DialerFunc == nil {
+		return net.Dial
 	}
+
+	return c.DialerFunc
 }
 
-func (c *Config) mustEmbedListener() {
-	if c.EmbedListener == nil {
-		panic("water: no listener is provided")
+func (c *Config) NetworkListenerOrPanic() net.Listener {
+	if c.NetworkListener == nil {
+		panic("water: network listener is not provided in config")
 	}
+
+	return c.NetworkListener
 }
 
-func (c *Config) mustSetWABin() {
-	if len(c.WABin) == 0 {
-		panic("water: WASI binary is not provided")
+func (c *Config) WATMBinOrPanic() []byte {
+	if len(c.WATMBin) == 0 {
+		panic("water: WebAssembly Transport Module binary is not provided in config")
 	}
+
+	return c.WATMBin
 }
 
-// WAConfig defines the configuration file used by the WASM module.
-type WAConfig struct {
+// WATMConfig defines the configuration file used by the WASM module.
+type WATMConfig struct {
 	FilePath string // Path to the config file.
 }
 
 // File opens the config file and returns the file descriptor.
-func (c *WAConfig) File() *os.File {
+func (c *WATMConfig) File() *os.File {
 	if c.FilePath == "" {
 		return nil
 	}
