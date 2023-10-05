@@ -1,4 +1,4 @@
-// no //go:build unix && !windows
+//go:build unix && !windows && !nov0
 
 package water_test
 
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gaukas/water"
+	"github.com/gaukas/water/internal/wasm"
 )
 
 var hexencoder_v0 []byte
@@ -58,7 +59,7 @@ func testDialerV0(t *testing.T) {
 			WAConfig: water.WAConfig{
 				FilePath: "./testdata/hexencoder_v0.dialer.json",
 			},
-			WASIConfigFactory: water.NewWasiConfigFactory(),
+			WASIConfigFactory: wasm.NewWasiConfigFactory(),
 		},
 	}
 	dialer.Config.WASIConfigFactory.InheritStdout()
@@ -110,11 +111,11 @@ func testListenerV0(t *testing.T) {
 		WAConfig: water.WAConfig{
 			FilePath: "./testdata/hexencoder_v0.listener.json",
 		},
-		WASIConfigFactory: water.NewWasiConfigFactory(),
+		WASIConfigFactory: wasm.NewWasiConfigFactory(),
 	}
 	config.WASIConfigFactory.InheritStdout()
 
-	lis, err := water.ListenConfig("tcp", "localhost:0", config)
+	lis, err := config.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -349,7 +350,7 @@ func benchmarkDialerV0(b *testing.B) {
 			WAConfig: water.WAConfig{
 				FilePath: "./testdata/hexencoder_v0.dialer.json",
 			},
-			WASIConfigFactory: water.NewWasiConfigFactory(),
+			WASIConfigFactory: wasm.NewWasiConfigFactory(),
 		},
 	}
 
@@ -422,10 +423,10 @@ func benchmarkLocalTCP(b *testing.B) {
 		b.Fatal(goroutineErr)
 	}
 
-	var sendMsg []byte = make([]byte, 512)
+	var sendMsg []byte = make([]byte, 1024)
 	rand.Read(sendMsg)
 
-	b.SetBytes(512) // we will send 512-byte data and 128-byte will be transmitted on wire due to hex encoding
+	b.SetBytes(1024)
 	b.ResetTimer()
 	start := time.Now()
 	for i := 0; i < b.N; i++ {
@@ -446,5 +447,5 @@ func benchmarkLocalTCP(b *testing.B) {
 		// time.Sleep(10 * time.Microsecond)
 	}
 	b.StopTimer()
-	b.Logf("avg bandwidth: %f MB/s (N=%d)", float64(b.N*512)/time.Since(start).Seconds()/1024/1024, b.N)
+	b.Logf("avg bandwidth: %f MB/s (N=%d)", float64(b.N*1024)/time.Since(start).Seconds()/1024/1024, b.N)
 }

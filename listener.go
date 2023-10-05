@@ -29,8 +29,6 @@ import (
 // The WASM module used by a Listener must implement a WASMListener.
 type Listener struct {
 	Config *Config
-	l      net.Listener
-
 	closed *atomic.Bool
 }
 
@@ -39,26 +37,28 @@ type Listener struct {
 //
 // This is the recommended way to create a Listener, unless there are
 // other requirements such as supplying a custom net.Listener. In that
-// case, a Listener could be created with NewListener() with a Config
+// case, a Listener could be created with WrapListener() with a Config
 // specifying a custom net.Listener.
-func ListenConfig(network, address string, config *Config) (net.Listener, error) {
+func (c *Config) Listen(network, address string) (net.Listener, error) {
 	lis, err := net.Listen(network, address)
 	if err != nil {
 		return nil, err
 	}
 
+	config := c.Clone()
+	config.EmbedListener = lis
+
 	return &Listener{
 		Config: config,
-		l:      lis,
 		closed: new(atomic.Bool),
 	}, nil
 }
 
-// NewListener creates a Listener with the given Config.
+// WrapListener creates a Listener with the given Config.
 //
 // The Config must specify a custom net.Listener, otherwise the
 // Accept() method will fail.
-func NewListener(config *Config) *Listener {
+func WrapListener(config *Config) *Listener {
 	return &Listener{
 		Config: config,
 		closed: new(atomic.Bool),
@@ -71,6 +71,8 @@ func NewListener(config *Config) *Listener {
 // The returned net.Conn implements net.Conn and could be seen as
 // the inbound connection with a wrapping transport protocol handled
 // by the WASM module.
+//
+// Implements net.Listener.
 func (l *Listener) Accept() (net.Conn, error) {
 	if l.closed.Load() {
 		return nil, fmt.Errorf("water: listener is closed")
@@ -79,41 +81,32 @@ func (l *Listener) Accept() (net.Conn, error) {
 	if l.Config == nil {
 		return nil, fmt.Errorf("water: dialing with nil config is not allowed")
 	}
-	if l.l == nil {
-		l.Config.mustEmbedListener()
-		l.l = l.Config.EmbedListener
-	}
-
+	l.Config.mustEmbedListener()
 	l.Config.mustSetWABin()
 
-	var core *runtimeCore
+	var core *core
 	var err error
 	core, err = Core(l.Config)
 	if err != nil {
 		return nil, err
 	}
 
-	// link listener funcs
-	wasiListener := MakeWASIListener(l.l, l.Config.WASIApplicationProtocolWrapper)
-	if err = core.LinkNetworkInterface(nil, wasiListener); err != nil {
-		return nil, err
-	}
-
-	err = core.Initialize()
-	if err != nil {
-		return nil, err
-	}
-
-	return core.InboundRuntimeConn()
+	return core.AcceptVersion()
 }
 
+// Close closes the listener.
+//
+// Implements net.Listener.
 func (l *Listener) Close() error {
 	if l.closed.CompareAndSwap(false, true) {
-		return l.l.Close()
+		return l.Config.EmbedListener.Close()
 	}
 	return nil
 }
 
+// Addr returns the listener's network address.
+//
+// Implements net.Listener.
 func (l *Listener) Addr() net.Addr {
-	return l.l.Addr()
+	return l.Config.EmbedListener.Addr()
 }

@@ -3,16 +3,11 @@ package water
 import (
 	"net"
 	"os"
+
+	"github.com/gaukas/water/internal/wasm"
 )
 
 type Config struct {
-	// ApplicationProtocolWrapper is a wrapper function that wraps
-	// around a given net.Conn to provide out of box application
-	// protocol support, such as TLS.
-	//
-	// TODO: decide either we keep this or not
-	WASIApplicationProtocolWrapper WASIApplicationProtocolWrapper
-
 	// EmbedDialer provides a dialer func that dials a remote
 	// network address. It enables the configured Dialer/Relay
 	// to dial a network address for the WASM module.
@@ -46,7 +41,25 @@ type Config struct {
 
 	// WasiConfigFactory is used to replicate the WASI config
 	// for each WASM instance created.
-	WASIConfigFactory *WASIConfigFactory
+	WASIConfigFactory *wasm.WASIConfigFactory
+}
+
+func (c *Config) Clone() *Config {
+	if c == nil {
+		return nil
+	}
+
+	WABinClone := make([]byte, len(c.WABin))
+	copy(WABinClone, c.WABin)
+
+	return &Config{
+		EmbedDialer:       c.EmbedDialer,
+		EmbedListener:     c.EmbedListener,
+		Feature:           c.Feature,
+		WABin:             WABinClone,
+		WAConfig:          c.WAConfig,
+		WASIConfigFactory: c.WASIConfigFactory.Clone(),
+	}
 }
 
 func (c *Config) embedDialerOrDefault() {

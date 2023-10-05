@@ -28,7 +28,7 @@ type Dialer struct {
 // protocol handled by the WASM module.
 //
 // Internally, DialContext() is called with a background context.
-func (d *Dialer) Dial(network, address string) (RuntimeConn, error) {
+func (d *Dialer) Dial(network, address string) (Conn, error) {
 	return d.DialContext(context.Background(), network, address)
 }
 
@@ -39,7 +39,7 @@ func (d *Dialer) Dial(network, address string) (RuntimeConn, error) {
 //
 // If the context expires before the connection is complete, an error is
 // returned.
-func (d *Dialer) DialContext(ctx context.Context, network, address string) (rConn RuntimeConn, err error) {
+func (d *Dialer) DialContext(ctx context.Context, network, address string) (conn Conn, err error) {
 	if d.Config == nil {
 		return nil, fmt.Errorf("water: dialing with nil config is not allowed")
 	}
@@ -49,30 +49,19 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (rCon
 	ctxReady, dialReady := context.WithCancel(context.Background())
 	go func() {
 		defer dialReady()
-		var core *runtimeCore
+		var core *core
 		core, err = Core(d.Config)
 		if err != nil {
 			return
 		}
 
-		// link dialer funcs
-		wasiDialer := MakeWASIDialer(network, address, d.Config.EmbedDialer, d.Config.WASIApplicationProtocolWrapper)
-		if err = core.LinkNetworkInterface(wasiDialer, nil); err != nil {
-			return
-		}
-
-		err = core.Initialize()
-		if err != nil {
-			return
-		}
-
-		rConn, err = core.OutboundRuntimeConn() // will return versioned RuntimeConn
+		conn, err = core.DialVersion(network, address)
 	}()
 
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-ctxReady.Done():
-		return rConn, err
+		return conn, err
 	}
 }

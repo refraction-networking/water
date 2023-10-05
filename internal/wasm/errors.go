@@ -1,4 +1,4 @@
-package water
+package wasm
 
 import "fmt"
 
@@ -16,6 +16,7 @@ const (
 	DOUBLE_INIT
 	FAILED_IO
 	NOT_INITIALIZED
+	WASICTX_ERR
 )
 
 // Pre-defined WASM Errors
@@ -28,6 +29,7 @@ var (
 	ErrDoubleInit      = fmt.Errorf("double init")
 	ErrFailedIO        = fmt.Errorf("i/o operation failed")
 	ErrNotInitialized  = fmt.Errorf("not initialized")
+	ErrWASICTX         = fmt.Errorf("wasi ctx error")
 )
 
 var mapWASMErrCode = map[WASMErrCode]error{
@@ -40,6 +42,7 @@ var mapWASMErrCode = map[WASMErrCode]error{
 	DOUBLE_INIT:      ErrDoubleInit,
 	FAILED_IO:        ErrFailedIO,
 	NOT_INITIALIZED:  ErrNotInitialized,
+	WASICTX_ERR:      ErrWASICTX,
 }
 
 // WASMErr returns the error corresponding to the WASM error code.

@@ -1,4 +1,4 @@
-package water
+package wasm
 
 import "github.com/bytecodealliance/wasmtime-go/v13"
 
@@ -14,6 +14,15 @@ func NewWasiConfigFactory() *WASIConfigFactory {
 	return &WASIConfigFactory{
 		setupFuncs: make([]func(*wasmtime.WasiConfig) error, 0),
 	}
+}
+
+func (wcf *WASIConfigFactory) Clone() *WASIConfigFactory {
+	clone := &WASIConfigFactory{
+		setupFuncs: make([]func(*wasmtime.WasiConfig) error, len(wcf.setupFuncs)),
+	}
+	copy(clone.setupFuncs, wcf.setupFuncs)
+
+	return clone
 }
 
 // GetConfig sets up and returns the finished wasmtime.WasiConfig.

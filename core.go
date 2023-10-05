@@ -6,9 +6,12 @@ import (
 	"github.com/bytecodealliance/wasmtime-go/v13"
 )
 
-// runtimeCore provides the WASM runtime base and is an internal struct
+// Core provides the WASM runtime base and is an internal struct
 // that every RuntimeXxx implementation will embed.
-type runtimeCore struct {
+//
+// Core is not versioned and is not subject to breaking changes
+// unless a severe bug needs to be fixed in a breaking way.
+type core struct {
 	// config
 	config *Config
 
@@ -18,25 +21,13 @@ type runtimeCore struct {
 	store    *wasmtime.Store
 	linker   *wasmtime.Linker
 	instance *wasmtime.Instance
-
-	/// WASI imports
-	deferFuncs []func() // defer functions to be called by WASM module on exit
-
-	/// WASI Exports
-	_init    *wasmtime.Func // _init()
-	_version *wasmtime.Func // _version()
-
-	// WASI Dialer and Listener
-	wd *WASIDialer
-	wl *WASIListener
 }
 
-// Core creates a new runtimeCore, which is the base of all
+// Core creates a new Core, which is the base of all
 // WASM runtime functionalities.
-func Core(config *Config) (c *runtimeCore, err error) {
-	c = &runtimeCore{
-		config:     config,
-		deferFuncs: make([]func(), 0),
+func Core(config *Config) (c *core, err error) {
+	c = &core{
+		config: config,
 	}
 
 	var wasiConfig *wasmtime.WasiConfig
@@ -64,195 +55,55 @@ func Core(config *Config) (c *runtimeCore, err error) {
 	return
 }
 
-// Config returns the Config used to create the runtimeCore.
-func (c *runtimeCore) Config() *Config {
+func (c *core) DialVersion(network, address string) (Conn, error) {
+	for _, export := range c.module.Exports() {
+		if f, ok := mapCoreDialContext[export.Name()]; ok {
+			return f(c, network, address)
+		}
+	}
+	return nil, fmt.Errorf("water: core loaded a WASM module that does not implement any known version")
+}
+
+func (c *core) AcceptVersion() (Conn, error) {
+	for _, export := range c.module.Exports() {
+		if f, ok := mapCoreAccept[export.Name()]; ok {
+			return f(c)
+		}
+	}
+	return nil, fmt.Errorf("water: core loaded a WASM module that does not implement any known version")
+}
+
+// Config returns the Config used to create the Core.
+func (c *core) Config() *Config {
 	return c.config
 }
 
-// WASIDialer returns the WASIDialer linked to the runtimeCore.
-//
-// If no WASIDialer is linked, nil is returned.
-func (c *runtimeCore) WASIDialer() *WASIDialer {
-	return c.wd
+func (c *core) Engine() *wasmtime.Engine {
+	return c.engine
 }
 
-// WASIListener returns the WASIListener linked to the runtimeCore.
-//
-// If no WASIListener is linked, nil is returned.
-func (c *runtimeCore) WASIListener() *WASIListener {
-	return c.wl
+func (c *core) Instance() *wasmtime.Instance {
+	return c.instance
 }
 
-// DeferFunc adds a defer function to the runtimeCore.
-//
-// All deferred functions will be called when the WASM module exits.
-func (c *runtimeCore) DeferFunc(f func()) {
-	c.deferFuncs = append(c.deferFuncs, f)
+func (c *core) Linker() *wasmtime.Linker {
+	return c.linker
 }
 
-func (c *runtimeCore) linkExecDeferredFunc() error {
-	if c.linker == nil {
-		return fmt.Errorf("water: linker not set, is runtimeCore initialized?")
+func (c *core) Module() *wasmtime.Module {
+	return c.module
+}
+
+func (c *core) Store() *wasmtime.Store {
+	return c.store
+}
+
+func (c *core) Instantiate() error {
+	instance, err := c.linker.Instantiate(c.store, c.module)
+	if err != nil {
+		return fmt.Errorf("water: (*wasmtime.Linker).Instantiate returned error: %w", err)
 	}
 
-	if err := c.linker.FuncNew("env", "deferh",
-		wasmtime.NewFuncType(
-			[]*wasmtime.ValType{},
-			[]*wasmtime.ValType{},
-		),
-		func(*wasmtime.Caller, []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
-			c.execDeferredFunc()
-			return []wasmtime.Val{}, nil
-		},
-	); err != nil {
-		return fmt.Errorf("water: (*wasmtime.Linker).FuncNew: %w", err)
-	}
-
+	c.instance = instance
 	return nil
-}
-
-// LinkNetworkInterface links the WASI Dialer and WASI Listener to the runtimeCore.
-//
-// The WASI Dialer must be linked for a dialer WASM module, and the WASI Listener
-// must be linked for a listener WASM module.
-func (c *runtimeCore) LinkNetworkInterface(dialer *WASIDialer, listener *WASIListener) error {
-	if c.linker == nil {
-		return fmt.Errorf("water: linker not set, is runtimeCore initialized?")
-	}
-
-	if dialer != nil {
-		if err := c.linkWASIDialFunc(dialer.dial); err != nil {
-			return fmt.Errorf("water: (*runtimeCore).linkWASIDialerFunc: %w", err)
-		}
-	} else {
-		if err := c.linkNOPWASIDialFunc(); err != nil {
-			return fmt.Errorf("water: (*runtimeCore).linkNOPWASIDialerFunc: %w", err)
-		}
-	}
-
-	if listener != nil {
-		if err := c.linkWASIAcceptFunc(listener.accept); err != nil {
-			return fmt.Errorf("water: (*runtimeCore).linkWASIAcceptFunc: %w", err)
-		}
-	} else {
-		if err := c.linkNOPWASIAcceptFunc(); err != nil {
-			return fmt.Errorf("water: (*runtimeCore).linkNOPWASIAcceptFunc: %w", err)
-		}
-	}
-
-	c.wd = dialer
-	c.wl = listener
-
-	return nil
-}
-
-// Initialize initializes the runtimeCore.
-//
-// A runtimeCore must be initialized before it can be used by a dialer/listener/relay.
-func (c *runtimeCore) Initialize() (err error) {
-	err = c.linkExecDeferredFunc()
-	if err != nil {
-		return fmt.Errorf("water: (*runtimeCore).linkExecDeferredFunc: %w", err)
-	}
-
-	// instantiate the WASM module
-	c.instance, err = c.linker.Instantiate(c.store, c.module)
-	if err != nil {
-		err = fmt.Errorf("water: (*wasmtime.Linker).Instantiate returned error: %w", err)
-		return
-	}
-
-	// get _init and _version functions
-	c._init = c.instance.GetFunc(c.store, "_init")
-	if c._init == nil {
-		return fmt.Errorf("water: instantiated WASM module does not export _init function")
-	}
-	c._version = c.instance.GetFunc(c.store, "_version")
-	if c._version == nil {
-		return fmt.Errorf("water: instantiated WASM module does not export _version function")
-	}
-
-	// initialize WASM instance.
-	// In a _init() call, the WASM module will setup all its internal states
-	_, err = c._init.Call(c.store)
-	if err != nil {
-		return fmt.Errorf("water: errored upon calling _init function: %w", err)
-	}
-
-	return nil
-}
-
-// OutboundRuntimeConn returns a RuntimeConn representing an outbound connection
-// by treating the runtimeCore as a dialer WASM module based on the version
-// of the WASM module.
-//
-// This function is only valid for a dialer WASM module.
-func (c *runtimeCore) OutboundRuntimeConn() (RuntimeConn, error) {
-	// get version
-	// In a _version() call, the WASM module will return its version
-	ret, err := c._version.Call(c.store)
-	if err != nil {
-		return nil, fmt.Errorf("water: calling _version function returned error: %w", err)
-	}
-	if ver, ok := ret.(int32); !ok {
-		return nil, fmt.Errorf("water: invalid _version function definition")
-	} else {
-		return OutboundRuntimeConnWithVersion(c, ver)
-	}
-}
-
-// InboundRuntimeConn returns a RuntimeConn representing an inbound connection
-// by treating the runtimeCore as a listener WASM module based on the version
-// of the WASM module.
-func (c *runtimeCore) InboundRuntimeConn() (RuntimeConn, error) {
-	// get version
-	// In a _version() call, the WASM module will return its version
-	ret, err := c._version.Call(c.store)
-	if err != nil {
-		return nil, fmt.Errorf("water: calling _version function returned error: %w", err)
-	}
-	if ver, ok := ret.(int32); !ok {
-		return nil, fmt.Errorf("water: invalid _version function definition")
-	} else {
-		return InboundRuntimeConnWithVersion(c, ver)
-	}
-}
-
-// execDeferredFunc executes all deferred functions.
-func (c *runtimeCore) execDeferredFunc() {
-	for _, f := range c.deferFuncs {
-		f()
-	}
-}
-
-// linkWASIDialFunc links a WASI dial function to the runtimeCore.
-func (c *runtimeCore) linkWASIDialFunc(f WASIConnectFunc) error {
-	err := c.linker.FuncNew("env", "dialh", WASIConnectFuncType, WrapWASIConnectFunc(f))
-	if err != nil {
-		return fmt.Errorf("(*wasmtime.Linker).FuncNew: %w", err)
-	}
-	return nil
-}
-
-// linkNOPWASIDialFunc links a NOP WASI dial function to the runtimeCore.
-//
-// Dialing will always fail with an error.
-func (c *runtimeCore) linkNOPWASIDialFunc() error {
-	return c.linkWASIDialFunc(nopWASIConnectFunc)
-}
-
-// linkWASIAcceptFunc links a WASI accept function to the runtimeCore.
-func (c *runtimeCore) linkWASIAcceptFunc(f WASIConnectFunc) error {
-	err := c.linker.FuncNew("env", "accepth", WASIConnectFuncType, WrapWASIConnectFunc(f))
-	if err != nil {
-		return fmt.Errorf("(*wasmtime.Linker).FuncNew: %w", err)
-	}
-	return nil
-}
-
-// linkNOPWASIAcceptFunc links a NOP WASI accept function to the runtimeCore.
-//
-// Accepting will always fail with an error.
-func (c *runtimeCore) linkNOPWASIAcceptFunc() error {
-	return c.linkWASIAcceptFunc(nopWASIConnectFunc)
 }
