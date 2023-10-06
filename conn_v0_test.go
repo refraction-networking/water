@@ -1,4 +1,4 @@
-// no //go:build unix && !windows && !nov0
+//go:build unix && !windows && !nov0
 
 package water_test
 
@@ -18,18 +18,17 @@ import (
 )
 
 var hexencoder_v0 []byte
+var plain_v0 []byte
 
-func TestRuntimeConnV0(t *testing.T) {
+func TestConnV0(t *testing.T) {
 	// read file into hexencoder_v0
 	var err error
 	hexencoder_v0, err = os.ReadFile("./testdata/hexencoder_v0.wasm")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Run("Dialer", testDialerV0)
-	t.Run("Listener", testListenerV0)
-	// t.Run("DialerIO", testDialerV0IO)
-	// t.Run("ListenerIO", testListenerV0IO)
+	t.Run("DialerV0", testDialerV0)
+	t.Run("ListenerV0", testListenerV0)
 }
 
 func testDialerV0(t *testing.T) {
@@ -77,27 +76,23 @@ func testDialerV0(t *testing.T) {
 	}
 
 	runtime.GC()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	if err = testUppercaseHexencoderConn(rConn, lisConn, []byte("hello"), []byte("world")); err != nil {
 		t.Fatal(err)
 	}
 
 	runtime.GC()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	if err = testUppercaseHexencoderConn(rConn, lisConn, []byte("i'm dialer"), []byte("hello dialer")); err != nil {
 		t.Fatal(err)
 	}
 
 	runtime.GC()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	if err = testUppercaseHexencoderConn(rConn, lisConn, []byte("who are you?"), []byte("I'm listener")); err != nil {
-		t.Fatal(err)
-	}
-
-	if err = testIO(rConn, lisConn, 10000, 512, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -162,10 +157,6 @@ func testListenerV0(t *testing.T) {
 
 	if err = testLowercaseHexencoderConn(rConn, dialConn, []byte("who are you?"), []byte("I'm dialer")); err != nil {
 		t.Error(err)
-	}
-
-	if err = testIO(rConn, dialConn, 10000, 512, 0); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -287,45 +278,19 @@ func testLowercaseHexencoderConn(encoderConn, plainConn net.Conn, dMsg, lMsg []b
 	return nil
 }
 
-func testIO(wrConn, rdConn net.Conn, N int, sz int, sleep time.Duration) error {
-	var sendMsg []byte = make([]byte, sz/2)
-	rand.Read(sendMsg)
-	var sendMsgHex []byte = make([]byte, sz)
-	hex.Encode(sendMsgHex, sendMsg)
-
-	var err error
-	for i := 0; i < N; i++ {
-		_, err = wrConn.Write(sendMsgHex)
-		if err != nil {
-			return fmt.Errorf("Write error: %w, cntr: %d, sz: %d, transmitted: %f MB", err, i, sz, float64(i*sz)/1024/1024)
-		}
-
-		// receive data
-		buf := make([]byte, 1024)
-		_, err = rdConn.Read(buf)
-		if err != nil {
-			return fmt.Errorf("Read error: %w, cntr: %d, sz: %d, transmitted: %f MB", err, i, sz, float64(i*sz)/1024/1024)
-		}
-
-		time.Sleep(sleep)
-	}
-
-	return nil
-}
-
-func BenchmarkRuntimeConnV0(b *testing.B) {
+func BenchmarkConnV0(b *testing.B) {
 	// read file into hexencoder_v0
 	var err error
-	hexencoder_v0, err = os.ReadFile("./testdata/hexencoder_v0.wasm")
+	plain_v0, err = os.ReadFile("./testdata/plain_v0.wasm")
 	if err != nil {
 		b.Fatal(err)
 	}
-	b.Run("Dialer", benchmarkDialerV0)
-	// b.Run("Listener", benchmarkListenerV0)
-	b.Run("LocalTCP", benchmarkLocalTCP)
+	b.Run("PlainV0-Dialer", benchmarkPlainV0Dialer)
+	b.Run("PlainV0-Listener", benchmarkPlainV0Listener)
+	b.Run("RefTCP", benchmarkReferenceTCP)
 }
 
-func benchmarkDialerV0(b *testing.B) {
+func benchmarkPlainV0Dialer(b *testing.B) {
 	// create random TCP listener listening on localhost
 	tcpLis, err := net.ListenTCP("tcp", nil)
 	if err != nil {
@@ -346,11 +311,7 @@ func benchmarkDialerV0(b *testing.B) {
 	// Dial
 	dialer := &water.Dialer{
 		Config: &water.Config{
-			WATMBin: hexencoder_v0,
-			WATMConfig: water.WATMConfig{
-				FilePath: "./testdata/hexencoder_v0.dialer.json",
-			},
-			WASIConfigFactory: wasm.NewWasiConfigFactory(),
+			WATMBin: plain_v0,
 		},
 	}
 
@@ -361,6 +322,67 @@ func benchmarkDialerV0(b *testing.B) {
 	defer rConn.Close()
 
 	// wait for listener to accept connection
+	wg.Wait()
+	if goroutineErr != nil {
+		b.Fatal(goroutineErr)
+	}
+
+	var sendMsg []byte = make([]byte, 1024)
+	rand.Read(sendMsg)
+
+	runtime.GC()
+	time.Sleep(10 * time.Millisecond)
+
+	b.SetBytes(1024)
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		_, err = rConn.Write(sendMsg)
+		if err != nil {
+			b.Logf("Write error, cntr: %d, N: %d", i, b.N)
+			b.Fatal(err)
+		}
+
+		buf := make([]byte, 1024+128)
+		_, err = lisConn.Read(buf)
+		if err != nil {
+			b.Logf("Read error, cntr: %d, N: %d", i, b.N)
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+	b.Logf("avg bandwidth: %f MB/s (N=%d)", float64(b.N*1024)/time.Since(start).Seconds()/1024/1024, b.N)
+}
+
+func benchmarkPlainV0Listener(b *testing.B) {
+	// prepare for listener
+	config := &water.Config{
+		WATMBin: plain_v0,
+	}
+
+	lis, err := config.Listen("tcp", "localhost:0")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	// goroutine to dial listener
+	var dialConn net.Conn
+	var goroutineErr error
+	var wg *sync.WaitGroup = new(sync.WaitGroup)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		dialConn, goroutineErr = net.Dial("tcp", lis.Addr().String())
+	}()
+
+	// Accept
+	rConn, err := lis.Accept()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer rConn.Close()
+
+	// wait for dialer to dial
 	wg.Wait()
 	if goroutineErr != nil {
 		b.Fatal(goroutineErr)
@@ -381,19 +403,17 @@ func benchmarkDialerV0(b *testing.B) {
 
 		// receive data
 		buf := make([]byte, 1024)
-		_, err = lisConn.Read(buf)
+		_, err = dialConn.Read(buf)
 		if err != nil {
 			b.Logf("Read error, cntr: %d, N: %d", i, b.N)
 			b.Fatal(err)
 		}
-
-		// time.Sleep(10 * time.Microsecond)
 	}
 	b.StopTimer()
 	b.Logf("avg bandwidth: %f MB/s (N=%d)", float64(b.N*1024)/time.Since(start).Seconds()/1024/1024, b.N)
 }
 
-func benchmarkLocalTCP(b *testing.B) {
+func benchmarkReferenceTCP(b *testing.B) {
 	// create random TCP listener listening on localhost
 	tcpLis, err := net.ListenTCP("tcp", nil)
 	if err != nil {

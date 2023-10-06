@@ -22,6 +22,12 @@ type Dialer struct {
 	Config *Config
 }
 
+func (c *Config) Dialer() *Dialer {
+	return &Dialer{
+		Config: c.Clone(),
+	}
+}
+
 // Dialer dials the given network address using the specified dialer
 // in the config. The returned RuntimeConn implements net.Conn and
 // could be seen as the outbound connection with a wrapping transport

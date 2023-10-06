@@ -17,6 +17,10 @@ func NewWasiConfigFactory() *WASIConfigFactory {
 }
 
 func (wcf *WASIConfigFactory) Clone() *WASIConfigFactory {
+	if wcf == nil || wcf.setupFuncs == nil {
+		return NewWasiConfigFactory()
+	}
+
 	clone := &WASIConfigFactory{
 		setupFuncs: make([]func(*wasmtime.WasiConfig) error, len(wcf.setupFuncs)),
 	}

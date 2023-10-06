@@ -15,14 +15,15 @@ import (
 	"github.com/gaukas/water/internal/wasm"
 )
 
-// WASMv0
+// WASMv0 is a wrapper around core which provides extended functionalities
+// for WASM runtime in V0 spec.
 type WASMv0 struct {
 	*core
 
 	_init *wasmtime.Func // _init() -> i32
 
 	// _dial:
-	//  - Calls to `env.dialh(apw) -> fd i32` to dial a network connection (wrapped with the
+	//  - Calls to `env.host_dial() -> fd: i32` to dial a network connection (wrapped with the
 	//  application protocol) and bind it to one of its file descriptors, record the fd as
 	//  `remoteConnFd`. This will be the fd it used to read/write data from/to the remote
 	//  destination.
@@ -32,7 +33,7 @@ type WASMv0 struct {
 	_dial *wasmtime.Func // _dial(callerConnFd i32) (remoteConnFd i32)
 
 	// _accept:
-	//  - Calls to `env.accepth(apw) -> fd i32` to accept a network connection (wrapped with the
+	//  - Calls to `env.host_accept() -> fd: i32` to accept a network connection (wrapped with the
 	//  application protocol) and bind it to one of its file descriptors, record the fd as
 	//  `sourceConnFd`. This will be the fd it used to read/write data from/to the source
 	//  address.
@@ -42,14 +43,12 @@ type WASMv0 struct {
 	_accept *wasmtime.Func // _accept(callerConnFd i32) (sourceConnFd i32)
 
 	// _read:
-	//  - if both `sourceConnFd` and `remoteConnFd` are valid, this will be a no-op.
 	//  - if `callerConnFd` is invalid, this will return an error.
 	//  - if `sourceConnFd` is valid, this will read from `sourceConnFd` and write to `callerConnFd`.
 	//  - if `remoteConnFd` is valid, this will read from `remoteConnFd` and write to `callerConnFd`.
 	_read *wasmtime.Func // _read() (err int32)
 
 	// _write:
-	//  - if both `sourceConnFd` and `remoteConnFd` are valid, this will be a no-op.
 	//  - if `callerConnFd` is invalid, this will return an error.
 	//  - if `sourceConnFd` is valid, this will read from `callerConnFd` and write to `sourceConnFd`.
 	//  - if `remoteConnFd` is valid, this will read from `callerConnFd` and write to `remoteConnFd`.
@@ -58,7 +57,7 @@ type WASMv0 struct {
 	// _close:
 	//  - Closes the all the file descriptors it owns.
 	//  - Cleans up any other resouce it allocated within the WASM module.
-	//  - Calls back to runtime by calling `env.defer` for the runtime to self-clean.
+	//  - Calls back to runtime by calling `env.host_defer` for the runtime to self-clean.
 	_close *wasmtime.Func
 
 	dialer   *v0.WASIDialer
@@ -161,15 +160,15 @@ func (w *WASMv0) Initialize() error {
 
 	// _dial
 	w._dial = w.Instance().GetFunc(w.Store(), "_dial")
-	if w._dial == nil {
-		return fmt.Errorf("water: WASM module does not export _dial")
-	}
+	// if w._dial == nil {
+	// 	return fmt.Errorf("water: WASM module does not export _dial")
+	// }
 
 	// _accept
 	w._accept = w.Instance().GetFunc(w.Store(), "_accept")
-	if w._accept == nil {
-		return fmt.Errorf("water: WASM module does not export _accept")
-	}
+	// if w._accept == nil {
+	// 	return fmt.Errorf("water: WASM module does not export _accept")
+	// }
 
 	// _close
 	w._close = w.Instance().GetFunc(w.Store(), "_close")
@@ -349,8 +348,14 @@ func (w *WASMv0) Cleanup() {
 }
 
 func (w *WASMv0) pushConfig(caller *wasmtime.Caller) (int32, error) {
+	// get config file
+	configFile := w.Config().WATMConfig.File()
+	if configFile == nil {
+		return wasm.INVALID_FD, nil // we don't return error here so no trap is triggered
+	}
+
 	// push file to WASM
-	configFd, err := caller.PushFile(w.Config().WATMConfig.File(), wasmtime.READ_ONLY)
+	configFd, err := caller.PushFile(configFile, wasmtime.READ_ONLY)
 	if err != nil {
 		return wasm.INVALID_FD, err
 	}

@@ -4,6 +4,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/gaukas/water/internal/log"
 	"github.com/gaukas/water/internal/wasm"
 )
 
@@ -89,7 +90,7 @@ func (c *Config) WATMBinOrPanic() []byte {
 	return c.WATMBin
 }
 
-// WATMConfig defines the configuration file used by the WASM module.
+// WATMConfig defines the configuration file used by the WebAssembly Transport Module.
 type WATMConfig struct {
 	FilePath string // Path to the config file.
 }
@@ -97,12 +98,14 @@ type WATMConfig struct {
 // File opens the config file and returns the file descriptor.
 func (c *WATMConfig) File() *os.File {
 	if c.FilePath == "" {
+		log.Errorf("water: WASM config file path is not provided in config")
 		return nil
 	}
 
 	f, err := os.Open(c.FilePath)
 	if err != nil {
-		panic("water: failed to open WASM config file: " + err.Error())
+		log.Errorf("water: failed to open WATM config file: %v", err)
+		return nil
 	}
 
 	return f
