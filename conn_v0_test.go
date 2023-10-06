@@ -58,10 +58,9 @@ func testDialerV0(t *testing.T) {
 			WATMConfig: water.WATMConfig{
 				FilePath: "./testdata/hexencoder_v0.dialer.json",
 			},
-			WASIConfigFactory: wasm.NewWasiConfigFactory(),
 		},
 	}
-	dialer.Config.WASIConfigFactory.InheritStdout()
+	dialer.Config.WASIConfig().InheritStdout()
 
 	rConn, err := dialer.Dial("tcp", tcpLis.Addr().String())
 	if err != nil {

@@ -42,10 +42,14 @@ type Config struct {
 	// the WASM Transport Module.
 	WATMConfig WATMConfig
 
-	// WasiConfigFactory is used to replicate the WASI config for each WASM
+	// wasiConfigFactory is used to replicate the WASI config for each WASM
 	// instance created. This field is for advanced use cases and/or debugging
 	// purposes only.
-	WASIConfigFactory *wasm.WASIConfigFactory
+	//
+	// Caller is supposed to call c.WASIConfig() to get the pointer to the
+	// WASIConfigFactory. If the pointer is nil, a new WASIConfigFactory will
+	// be created and returned.
+	wasiConfigFactory *wasm.WASIConfigFactory
 }
 
 func (c *Config) Clone() *Config {
@@ -62,7 +66,7 @@ func (c *Config) Clone() *Config {
 		NetworkListener:   c.NetworkListener,
 		Feature:           c.Feature,
 		WATMConfig:        c.WATMConfig,
-		WASIConfigFactory: c.WASIConfigFactory.Clone(),
+		wasiConfigFactory: c.wasiConfigFactory.Clone(),
 	}
 }
 
@@ -88,6 +92,14 @@ func (c *Config) WATMBinOrPanic() []byte {
 	}
 
 	return c.WATMBin
+}
+
+func (c *Config) WASIConfig() *wasm.WASIConfigFactory {
+	if c.wasiConfigFactory == nil {
+		c.wasiConfigFactory = wasm.NewWasiConfigFactory()
+	}
+
+	return c.wasiConfigFactory
 }
 
 // WATMConfig defines the configuration file used by the WebAssembly Transport Module.
