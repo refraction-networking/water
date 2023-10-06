@@ -278,7 +278,7 @@ func testLowercaseHexencoderConn(encoderConn, plainConn net.Conn, dMsg, lMsg []b
 }
 
 func BenchmarkConnV0(b *testing.B) {
-	// read file into hexencoder_v0
+	// read file into plain_v0
 	var err error
 	plain_v0, err = os.ReadFile("./testdata/plain_v0.wasm")
 	if err != nil {
