@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/gaukas/water"
-	"github.com/gaukas/water/internal/wasm"
 )
 
 var hexencoder_v0 []byte
@@ -105,9 +104,9 @@ func testListenerV0(t *testing.T) {
 		WATMConfig: water.WATMConfig{
 			FilePath: "./testdata/hexencoder_v0.listener.json",
 		},
-		WASIConfigFactory: wasm.NewWasiConfigFactory(),
+		// WASIConfigFactory: wasm.NewWasiConfigFactory(),
 	}
-	config.WASIConfigFactory.InheritStdout()
+	config.WASIConfig().InheritStdout()
 
 	lis, err := config.Listen("tcp", "localhost:0")
 	if err != nil {
