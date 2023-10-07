@@ -4,7 +4,6 @@ package log
 
 import (
 	"fmt"
-
 	"log/slog"
 )
 

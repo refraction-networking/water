@@ -16,8 +16,10 @@ import (
 	"github.com/gaukas/water"
 )
 
-var hexencoder_v0 []byte
-var plain_v0 []byte
+var (
+	hexencoder_v0 []byte
+	plain_v0      []byte
+)
 
 func TestConnV0(t *testing.T) {
 	// read file into hexencoder_v0
