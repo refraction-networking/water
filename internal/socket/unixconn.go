@@ -11,8 +11,6 @@ import (
 	"time"
 )
 
-const ()
-
 // UnixConnWrap wraps an io.Reader/io.Writer/io.ReadWriteCloser
 // interface into a UnixConn.
 //

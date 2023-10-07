@@ -6,8 +6,10 @@ import (
 	"time"
 )
 
-var mapCoreDialContext = make(map[string]func(core *core, network, address string) (Conn, error))
-var mapCoreAccept = make(map[string]func(*core) (Conn, error))
+var (
+	mapCoreDialContext = make(map[string]func(core *core, network, address string) (Conn, error))
+	mapCoreAccept      = make(map[string]func(*core) (Conn, error))
+)
 
 // Conn is an abstracted connection interface which encapsulates
 // a WASM runtime core.
