@@ -1,76 +1,71 @@
 package water
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
-	"net"
-	"strings"
 )
 
-type Dialer interface {
-	// Dial connects to the address on the named network.
-	Dial(network, address string) (net.Conn, error)
+// Dialer dials the given network address upon caller calling
+// Dial() and returns a net.Conn which is connected to the
+// WASM module.
+//
+// The structure of a Dialer is as follows:
+//
+//	        dial +----------------+ dial
+//	       ----->|     Decode     |------>
+//	Caller       |  WASM Runtime  |        Remote
+//	       <-----| Decode/Encode  |<------
+//	             +----------------+
+//	                   Dialer
+type Dialer struct {
+	// Config is the configuration for the core.
+	Config *Config
 }
 
-type dialer struct {
-	tlsDialer Dialer // for a tlsDialer, Dial() function should return a *tls.Conn or its equivalent. And Handshake() should be called before returning.
-}
-
-func DefaultDialer() Dialer {
-	return &dialer{
-		tlsDialer: TLSDialerWithConfig(&tls.Config{}),
+func (c *Config) Dialer() *Dialer {
+	return &Dialer{
+		Config: c.Clone(),
 	}
 }
 
-func DialerWithTLS(tlsDialer Dialer) Dialer {
-	return &dialer{
-		tlsDialer: tlsDialer,
+// Dialer dials the given network address using the specified dialer
+// in the config. The returned RuntimeConn implements net.Conn and
+// could be seen as the outbound connection with a wrapping transport
+// protocol handled by the WASM module.
+//
+// Internally, DialContext() is called with a background context.
+func (d *Dialer) Dial(network, address string) (Conn, error) {
+	return d.DialContext(context.Background(), network, address)
+}
+
+// DialContext dials the given network address using the specified dialer
+// in the config. The returned RuntimeConn implements net.Conn and
+// could be seen as the outbound connection with a wrapping transport
+// protocol handled by the WASM module.
+//
+// If the context expires before the connection is complete, an error is
+// returned.
+func (d *Dialer) DialContext(ctx context.Context, network, address string) (conn Conn, err error) {
+	if d.Config == nil {
+		return nil, fmt.Errorf("water: dialing with nil config is not allowed")
 	}
-}
 
-func (d *dialer) Dial(network, address string) (net.Conn, error) {
-	switch network {
-	case "tls", "tls4", "tls6":
-		tlsNetwork := strings.ReplaceAll(network, "tls", "tcp") // tls4 -> tcp4, etc.
-		return d.tlsDialer.Dial(tlsNetwork, address)
-	default:
-		return net.Dial(network, address)
+	ctxReady, dialReady := context.WithCancel(context.Background())
+	go func() {
+		defer dialReady()
+		var core *core
+		core, err = Core(d.Config)
+		if err != nil {
+			return
+		}
+
+		conn, err = core.DialVersion(network, address)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-ctxReady.Done():
+		return conn, err
 	}
-}
-
-type tlsDialer struct {
-	tlsConfig *tls.Config
-}
-
-func TLSDialerWithConfig(config *tls.Config) Dialer {
-	return &tlsDialer{config.Clone()}
-}
-
-func (d *tlsDialer) Dial(network, address string) (net.Conn, error) {
-	d.tlsConfig.ServerName = strings.Split(address, ":")[0] // "example.com:443" -> "example.com"
-	tlsConn, err := tls.Dial(network, address, d.tlsConfig)
-	if err != nil {
-		return nil, fmt.Errorf("tls.Dial(): %w", err)
-	}
-	return tlsConn, nil
-}
-
-type AddressedDialer interface {
-	Dial(network string) (net.Conn, error)
-}
-
-type addressedDialer struct {
-	dialer  Dialer
-	address string
-}
-
-func SetDialerAddress(dialer Dialer, address string) AddressedDialer {
-	return &addressedDialer{
-		dialer:  dialer,
-		address: address,
-	}
-}
-
-func (d *addressedDialer) Dial(network string) (net.Conn, error) {
-	return d.dialer.Dial(network, d.address)
 }

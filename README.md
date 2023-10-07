@@ -5,39 +5,21 @@ W.A.T.E.R. provides a runtime environment for WebAssembly modules to run in and 
 
 ## API 
 
-Currently, W.A.T.E.R. provides a set of APIs relying on **WASI Preview 1 (wasip1)** snapshot. 
+Currently, W.A.T.E.R. provides a set of APIs based on **WASI Preview 1 (wasip1)** snapshot. 
 
 ### Config
 A `Config` is a struct that contains the configuration for a WASI instance. It is used to configure the WASI reactor before starting it. 
 
-### RuntimeConn
-A `RuntimeConn` is a `Conn` that represents a connection from the local user to a remote peer. Each living `RuntimeConn` encapsulates a running WASI instance. 
-It process the data sent from the local user and send it to the remote peer, and vice versa.
+### Dialer 
 
-A `RuntimeConn` interfaces `io.ReadWriteCloser` and is always and only spawned by a `RuntimeConnDialer`.
+A `Dialer` could be used to dial a remote address upon `Dial()` and return a `net.Conn` back to the caller once the connection is established. Caller could use the `net.Conn` to read and write data to the remote address and the data will be processed by a WebAssembly instance.
 
-#### RuntimeConnDialer
-A `RuntimeConnDialer` is a `Dialer` loaded with a `Config` that can dial for `RuntimeConn` as abstracted connections. Currently, it is just a wrapper around a `Config`. **It does not contain any running WASI instance.**
+### Listener
 
-### RuntimeDialer _(TODO)_
-A `RuntimeDialer` is a `Dialer` that dials for `RuntimeDialerConn`. Each living `RuntimeDialer` encapsulates a running WASI instance. It manages multiple `RuntimeDialerConn` instances created upon caller's request.
+A `Listener` could be used to listen on a local address. Upon `Accept()`, it returns a `net.Conn` back once an incoming connection is accepted from the wrapped listener. Caller could use the `net.Conn` to read and write data to the remote address and the data will be processed by a WebAssembly instance.
 
-\* Not to be confused with [`RuntimeConnDialer`](#runtimeconndialer), a static dialer which creates `RuntimeConn` instances from `Config`.
+### Server
 
-#### RuntimeDialerConn
-A `RuntimeDialerConn` is a sub-`Conn` spawned by a `RuntimeDialer` upon caller's request. It is a `Conn` that is dialed by a `RuntimeDialer` and is used to communicate with a remote peer. Multiple `RuntimeDialerConn` instances can be created from a single `RuntimeDialer`, which means they could be related to one single WASI instance.
+A `Server` somewhat combines the role of `Dialer` and `Listener`. It could be used to listen on a local address and dial a remote address and automatically `Accept()` the incoming connections, feed them into the WebAssembly instance and `Dial()` the pre-defined remote address. Without any caller interaction, the `Server` will automatically* handle the data transmission between the two ends.
 
-\* Not to be confused with [`RuntimeConn`](#runtimeconn), an `io.ReadWriteCloser` that encapsulates a running WASI instance each.
-
-## TODOs
-
-- W.A.T.E.R. API
-    - [x] `Config`
-    - [x] `RuntimeConn`
-        - [x] `RuntimeConnDialer`
-    - [ ] `RuntimeDialer`
-        - [ ] `RuntimeDialerConn`
-- [x] Minimal W.A.T.E.R. WASI example
-    - No background worker threads
-- [ ] Multi-threaded W.A.T.E.R. WASI example
-    - [ ] Background worker threads working 
+***TODO: Server could not be realistic until WASI multi-threading or blocking mainloop is supported**
