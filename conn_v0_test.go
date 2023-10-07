@@ -67,7 +67,6 @@ func testDialerV0(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer rConn.Close()
 
 	// wait for listener to accept connection
 	wg.Wait()
@@ -79,21 +78,25 @@ func testDialerV0(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	if err = testUppercaseHexencoderConn(rConn, lisConn, []byte("hello"), []byte("world")); err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	runtime.GC()
 	time.Sleep(10 * time.Millisecond)
 
 	if err = testUppercaseHexencoderConn(rConn, lisConn, []byte("i'm dialer"), []byte("hello dialer")); err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	runtime.GC()
 	time.Sleep(10 * time.Millisecond)
 
 	if err = testUppercaseHexencoderConn(rConn, lisConn, []byte("who are you?"), []byte("I'm listener")); err != nil {
-		t.Fatal(err)
+		t.Error(err)
+	}
+
+	if err = rConn.Close(); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -130,7 +133,6 @@ func testListenerV0(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer rConn.Close()
 
 	// wait for dialer to dial
 	wg.Wait()
@@ -156,6 +158,10 @@ func testListenerV0(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	if err = testLowercaseHexencoderConn(rConn, dialConn, []byte("who are you?"), []byte("I'm dialer")); err != nil {
+		t.Error(err)
+	}
+
+	if err = rConn.Close(); err != nil {
 		t.Error(err)
 	}
 }
@@ -380,7 +386,6 @@ func benchmarkPlainV0Listener(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer rConn.Close()
 
 	// wait for dialer to dial
 	wg.Wait()
@@ -411,6 +416,10 @@ func benchmarkPlainV0Listener(b *testing.B) {
 	}
 	b.StopTimer()
 	b.Logf("avg bandwidth: %f MB/s (N=%d)", float64(b.N*1024)/time.Since(start).Seconds()/1024/1024, b.N)
+
+	if err = rConn.Close(); err != nil {
+		b.Fatal(err)
+	}
 }
 
 func benchmarkReferenceTCP(b *testing.B) {
@@ -435,7 +444,6 @@ func benchmarkReferenceTCP(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer nConn.Close()
 
 	// wait for listener to accept connection
 	wg.Wait()
@@ -468,4 +476,8 @@ func benchmarkReferenceTCP(b *testing.B) {
 	}
 	b.StopTimer()
 	b.Logf("avg bandwidth: %f MB/s (N=%d)", float64(b.N*1024)/time.Since(start).Seconds()/1024/1024, b.N)
+
+	if err = nConn.Close(); err != nil {
+		b.Fatal(err)
+	}
 }
