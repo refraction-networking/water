@@ -9,6 +9,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/gaukas/water/internal/log"
 	"github.com/gaukas/water/internal/socket"
 	v0 "github.com/gaukas/water/internal/v0"
 	"github.com/gaukas/water/internal/wasm"
@@ -59,7 +60,11 @@ func DialV0(core *core, network, address string) (c Conn, err error) {
 	var wasmCallerConn net.Conn
 	wasmCallerConn, conn.uoConn, err = socket.UnixConnPair("")
 	if err != nil {
-		return nil, fmt.Errorf("water: socket.UnixConnPair returned error: %w", err)
+		if wasmCallerConn == nil || conn.uoConn == nil {
+			return nil, fmt.Errorf("water: socket.UnixConnPair returned error: %w", err)
+		} else { // likely due to Close() call errored
+			log.Errorf("water: socket.UnixConnPair returned error: %v", err)
+		}
 	}
 
 	wasmNetworkConn, err := conn.wasm.DialFrom(wasmCallerConn)
@@ -102,7 +107,11 @@ func AcceptV0(core *core) (c Conn, err error) {
 	var wasmCallerConn net.Conn
 	wasmCallerConn, conn.uoConn, err = socket.UnixConnPair("")
 	if err != nil {
-		return nil, fmt.Errorf("water: socket.UnixConnPair returned error: %w", err)
+		if wasmCallerConn == nil || conn.uoConn == nil {
+			return nil, fmt.Errorf("water: socket.UnixConnPair returned error: %w", err)
+		} else { // likely due to Close() call errored
+			log.Errorf("water: socket.UnixConnPair returned error: %v", err)
+		}
 	}
 
 	wasmNetworkConn, err := conn.wasm.AcceptFor(wasmCallerConn)

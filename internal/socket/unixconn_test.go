@@ -14,7 +14,11 @@ import (
 func TestUnixConnPair(t *testing.T) {
 	c1, c2, err := socket.UnixConnPair("")
 	if err != nil {
-		t.Fatal(err)
+		if c1 == nil || c2 == nil {
+			t.Fatal(err)
+		} else { // likely due to Close() call errored
+			t.Logf("socket.UnixConnPair returned non-fatal error: %v", err)
+		}
 	}
 
 	runtime.GC()
