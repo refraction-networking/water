@@ -7,6 +7,8 @@ import (
 
 	"github.com/gaukas/water"
 	"github.com/gaukas/water/internal/log"
+
+	waterconfig "github.com/gaukas/water/config"
 )
 
 func main() {
@@ -22,14 +24,14 @@ func main() {
 	}
 
 	// Listen
-	config := &water.Config{
+	config := &waterconfig.Config{
 		WATMBin: hexencoder_v0,
-		WATMConfig: water.WATMConfig{
+		WATMConfig: waterconfig.WATMConfig{
 			FilePath: "./examples/hexencoder/hexencoder_v0.listener.json",
 		},
 	}
 	config.WASIConfig().InheritStdout()
-	lis, err := config.Listen("tcp", localAddr)
+	lis, err := water.NewListener(config, "tcp", localAddr)
 	if err != nil {
 		panic(err)
 	}

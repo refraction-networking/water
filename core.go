@@ -4,16 +4,25 @@ import (
 	"fmt"
 
 	"github.com/bytecodealliance/wasmtime-go/v13"
+	"github.com/gaukas/water/config"
+	"github.com/gaukas/water/interfaces"
 )
 
-// Core provides the WASM runtime base and is an internal struct
+// core provides the WASM runtime base and is an internal struct
 // that every RuntimeXxx implementation will embed.
 //
-// Core is not versioned and is not subject to breaking changes
-// unless a severe bug needs to be fixed in a breaking way.
+// core is designed to be unmanaged and version-independent,
+// which means it does not provide any functionalities other
+// than simply collecting all the WASM runtime-related objects
+// without overwriting access on them. And core is not subject
+// to breaking changes unless a severe bug needs to be fixed
+// in such a breaking manner inevitably.
+//
+// interface.Core is the public interface for core that developers
+// are supposed to use.
 type core struct {
 	// config
-	config *Config
+	config *config.Config
 
 	// wasmtime
 	engine   *wasmtime.Engine
@@ -23,25 +32,26 @@ type core struct {
 	instance *wasmtime.Instance
 }
 
-// Core creates a new Core, which is the base of all
-// WASM runtime functionalities.
-func Core(config *Config) (c *core, err error) {
-	c = &core{
+// Core creates a new Core with the given config.
+//
+// It uses the default implementation of interface.Core as
+// defined in this file.
+func Core(config *config.Config) (interfaces.Core, error) {
+	c := &core{
 		config: config,
 	}
 
-	var wasiConfig *wasmtime.WasiConfig
-	wasiConfig, err = c.config.WASIConfig().GetConfig()
+	wasiConfig, err := c.config.WASIConfig().GetConfig()
 	if err != nil {
 		err = fmt.Errorf("water: (*WasiConfigFactory).GetConfig returned error: %w", err)
-		return
+		return nil, err
 	}
 
 	c.engine = wasmtime.NewEngine()
 	c.module, err = wasmtime.NewModule(c.engine, c.config.WATMBinOrPanic())
 	if err != nil {
 		err = fmt.Errorf("water: wasmtime.NewModule returned error: %w", err)
-		return
+		return nil, err
 	}
 	c.store = wasmtime.NewStore(c.engine)
 	c.store.SetWasiConfig(wasiConfig)
@@ -49,32 +59,14 @@ func Core(config *Config) (c *core, err error) {
 	err = c.linker.DefineWasi()
 	if err != nil {
 		err = fmt.Errorf("water: (*wasmtime.Linker).DefineWasi returned error: %w", err)
-		return
+		return nil, err
 	}
 
-	return
-}
-
-func (c *core) DialVersion(network, address string) (Conn, error) {
-	for _, export := range c.module.Exports() {
-		if f, ok := mapCoreDialContext[export.Name()]; ok {
-			return f(c, network, address)
-		}
-	}
-	return nil, fmt.Errorf("water: core loaded a WASM module that does not implement any known version")
-}
-
-func (c *core) AcceptVersion() (Conn, error) {
-	for _, export := range c.module.Exports() {
-		if f, ok := mapCoreAccept[export.Name()]; ok {
-			return f(c)
-		}
-	}
-	return nil, fmt.Errorf("water: core loaded a WASM module that does not implement any known version")
+	return c, nil
 }
 
 // Config returns the Config used to create the Core.
-func (c *core) Config() *Config {
+func (c *core) Config() *config.Config {
 	return c.config
 }
 

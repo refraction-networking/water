@@ -8,6 +8,8 @@ import (
 
 	"github.com/gaukas/water"
 	"github.com/gaukas/water/internal/log"
+
+	waterconfig "github.com/gaukas/water/config"
 )
 
 func main() {
@@ -24,9 +26,9 @@ func main() {
 
 	// Dial
 	dialer := &water.Dialer{
-		Config: &water.Config{
+		Config: &waterconfig.Config{
 			WATMBin: hexencoder_v0,
-			WATMConfig: water.WATMConfig{
+			WATMConfig: waterconfig.WATMConfig{
 				FilePath: "./examples/hexencoder/hexencoder_v0.dialer.json",
 			},
 		},

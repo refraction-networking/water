@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"net"
 	"sync/atomic"
+
+	"github.com/gaukas/water/config"
+	"github.com/gaukas/water/interfaces"
 )
 
 // Listener listens on a local network address and upon caller
@@ -28,18 +31,18 @@ import (
 //
 // The WASM module used by a Listener must implement a WASMListener.
 type Listener struct {
-	Config *Config
+	Config *config.Config
 	closed *atomic.Bool
 }
 
-// ListenConfig listens on the network address and returns a Listener
+// NewListener listens on the network address and returns a Listener
 // configured with the given Config.
 //
 // This is the recommended way to create a Listener, unless there are
 // other requirements such as supplying a custom net.Listener. In that
 // case, a Listener could be created with WrapListener() with a Config
 // specifying a custom net.Listener.
-func (c *Config) Listen(network, address string) (net.Listener, error) {
+func NewListener(c *config.Config, network, address string) (net.Listener, error) {
 	lis, err := net.Listen(network, address)
 	if err != nil {
 		return nil, err
@@ -58,7 +61,7 @@ func (c *Config) Listen(network, address string) (net.Listener, error) {
 //
 // The Config must specify a custom net.Listener, otherwise the
 // Accept() method will fail.
-func WrapListener(config *Config) *Listener {
+func WrapListener(config *config.Config) *Listener {
 	return &Listener{
 		Config: config,
 		closed: new(atomic.Bool),
@@ -82,14 +85,14 @@ func (l *Listener) Accept() (net.Conn, error) {
 		return nil, fmt.Errorf("water: dialing with nil config is not allowed")
 	}
 
-	var core *core
+	var core interfaces.Core
 	var err error
 	core, err = Core(l.Config)
 	if err != nil {
 		return nil, err
 	}
 
-	return core.AcceptVersion()
+	return AcceptVersion(core)
 }
 
 // Close closes the listener.

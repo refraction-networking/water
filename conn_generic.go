@@ -2,36 +2,27 @@ package water
 
 import (
 	"fmt"
-	"net"
-	"time"
+
+	"github.com/gaukas/water/interfaces"
 )
+
+type coreDial = func(core interfaces.Core, network, address string) (interfaces.Conn, error)
+type coreAccept = func(core interfaces.Core) (interfaces.Conn, error)
 
 var (
-	mapCoreDialContext = make(map[string]func(core *core, network, address string) (Conn, error))
-	mapCoreAccept      = make(map[string]func(*core) (Conn, error))
+	mapCoreDial   = make(map[string]coreDial)
+	mapCoreAccept = make(map[string]coreAccept)
 )
 
-// Conn is an abstracted connection interface which encapsulates
-// a WASM runtime core.
-type Conn interface {
-	net.Conn
-
-	// For forward compatibility with any new methods added to the
-	// interface, all Conn implementations MUST embed the
-	// UnimplementedConn in order to make sure they could be used
-	// in the future without any code change.
-	mustEmbedUnimplementedConn()
-}
-
-func RegisterDial(version string, dialContext func(core *core, network, address string) (Conn, error)) error {
-	if _, ok := mapCoreDialContext[version]; ok {
+func RegisterDial(version string, dial coreDial) error {
+	if _, ok := mapCoreDial[version]; ok {
 		return fmt.Errorf("water: core dial context already registered for version %s", version)
 	}
-	mapCoreDialContext[version] = dialContext
+	mapCoreDial[version] = dial
 	return nil
 }
 
-func RegisterAccept(version string, accept func(*core) (Conn, error)) error {
+func RegisterAccept(version string, accept coreAccept) error {
 	if _, ok := mapCoreAccept[version]; ok {
 		return fmt.Errorf("water: core accept already registered for version %s", version)
 	}
@@ -39,44 +30,20 @@ func RegisterAccept(version string, accept func(*core) (Conn, error)) error {
 	return nil
 }
 
-// UnimplementedConn is used to provide forward compatibility for
-// implementations of Conn, such that if new methods are added
-// to the interface, old implementations will not be required to implement
-// each of them.
-type UnimplementedConn struct{}
-
-func (*UnimplementedConn) Read([]byte) (int, error) {
-	return 0, fmt.Errorf("water: Read() is not implemented")
+func DialVersion(core interfaces.Core, network, address string) (interfaces.Conn, error) {
+	for _, export := range core.Module().Exports() {
+		if f, ok := mapCoreDial[export.Name()]; ok {
+			return f(core, network, address)
+		}
+	}
+	return nil, fmt.Errorf("water: core loaded a WASM module that does not implement any known version")
 }
 
-func (*UnimplementedConn) Write([]byte) (int, error) {
-	return 0, fmt.Errorf("water: Write() is not implemented")
+func AcceptVersion(core interfaces.Core) (interfaces.Conn, error) {
+	for _, export := range core.Module().Exports() {
+		if f, ok := mapCoreAccept[export.Name()]; ok {
+			return f(core)
+		}
+	}
+	return nil, fmt.Errorf("water: core loaded a WASM module that does not implement any known version")
 }
-
-func (*UnimplementedConn) Close() error {
-	return fmt.Errorf("water: Close() is not implemented")
-}
-
-func (*UnimplementedConn) LocalAddr() net.Addr {
-	return nil
-}
-
-func (*UnimplementedConn) RemoteAddr() net.Addr {
-	return nil
-}
-
-func (*UnimplementedConn) SetDeadline(_ time.Time) error {
-	return fmt.Errorf("water: SetDeadline() is not implemented")
-}
-
-func (*UnimplementedConn) SetReadDeadline(_ time.Time) error {
-	return fmt.Errorf("water: SetReadDeadline() is not implemented")
-}
-
-func (*UnimplementedConn) SetWriteDeadline(_ time.Time) error {
-	return fmt.Errorf("water: SetWriteDeadline() is not implemented")
-}
-
-func (*UnimplementedConn) mustEmbedUnimplementedConn() {}
-
-var _ Conn = (*UnimplementedConn)(nil)

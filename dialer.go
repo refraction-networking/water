@@ -3,6 +3,9 @@ package water
 import (
 	"context"
 	"fmt"
+
+	"github.com/gaukas/water/config"
+	"github.com/gaukas/water/interfaces"
 )
 
 // Dialer dials the given network address upon caller calling
@@ -19,10 +22,10 @@ import (
 //	                   Dialer
 type Dialer struct {
 	// Config is the configuration for the core.
-	Config *Config
+	Config *config.Config
 }
 
-func (c *Config) Dialer() *Dialer {
+func NewDialer(c *config.Config) *Dialer {
 	return &Dialer{
 		Config: c.Clone(),
 	}
@@ -34,7 +37,7 @@ func (c *Config) Dialer() *Dialer {
 // protocol handled by the WASM module.
 //
 // Internally, DialContext() is called with a background context.
-func (d *Dialer) Dial(network, address string) (Conn, error) {
+func (d *Dialer) Dial(network, address string) (interfaces.Conn, error) {
 	return d.DialContext(context.Background(), network, address)
 }
 
@@ -45,7 +48,7 @@ func (d *Dialer) Dial(network, address string) (Conn, error) {
 //
 // If the context expires before the connection is complete, an error is
 // returned.
-func (d *Dialer) DialContext(ctx context.Context, network, address string) (conn Conn, err error) {
+func (d *Dialer) DialContext(ctx context.Context, network, address string) (conn interfaces.Conn, err error) {
 	if d.Config == nil {
 		return nil, fmt.Errorf("water: dialing with nil config is not allowed")
 	}
@@ -53,13 +56,13 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (conn
 	ctxReady, dialReady := context.WithCancel(context.Background())
 	go func() {
 		defer dialReady()
-		var core *core
+		var core interfaces.Core
 		core, err = Core(d.Config)
 		if err != nil {
 			return
 		}
 
-		conn, err = core.DialVersion(network, address)
+		conn, err = DialVersion(core, network, address)
 	}()
 
 	select {

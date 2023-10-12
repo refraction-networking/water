@@ -93,15 +93,17 @@ func UnixConnWrap(obj any) (*net.UnixConn, error) {
 	return unixConn, nil
 }
 
-func UnixConnPair(path string) (c1, c2 net.Conn, err error) {
-	unixPath := path
-	if path == "" {
+func UnixConnPair(path ...string) (c1, c2 net.Conn, err error) {
+	unixPath := ""
+	if len(path) == 0 {
 		// randomize a socket name
 		randBytes := make([]byte, 16)
 		if _, err := rand.Read(randBytes); err != nil {
 			return nil, nil, fmt.Errorf("crypto/rand.Read returned error: %w", err)
 		}
 		unixPath = os.TempDir() + string(os.PathSeparator) + fmt.Sprintf("%x", randBytes)
+	} else {
+		unixPath = path[0]
 	}
 
 	// create a one-time use UnixListener

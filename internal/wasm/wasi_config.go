@@ -10,6 +10,7 @@ type WASIConfigFactory struct {
 	setupFuncs []func(*wasmtime.WasiConfig) error // if any of these functions returns an error, the whole setup will fail.
 }
 
+// NewWasiConfigFactory creates a new WASIConfigFactory.
 func NewWasiConfigFactory() *WASIConfigFactory {
 	return &WASIConfigFactory{
 		setupFuncs: make([]func(*wasmtime.WasiConfig) error, 0),
@@ -17,7 +18,11 @@ func NewWasiConfigFactory() *WASIConfigFactory {
 }
 
 func (wcf *WASIConfigFactory) Clone() *WASIConfigFactory {
-	if wcf == nil || wcf.setupFuncs == nil {
+	if wcf == nil {
+		return nil
+	}
+
+	if wcf.setupFuncs == nil {
 		return NewWasiConfigFactory()
 	}
 
