@@ -56,9 +56,11 @@ func handleConn(peer string, conn net.Conn) {
 		defer close(chanMsgRecv)
 		buf := make([]byte, 1024) // 1 KiB
 		for {
+			conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 			n, err := conn.Read(buf)
 			if err != nil {
 				log.Warnf("read %s: error %v, tearing down connection...", peer, err)
+				conn.Close()
 				return
 			}
 			chanMsgRecv <- buf[:n]

@@ -208,17 +208,20 @@ func (c *ConnV0) Close() error {
 		}
 	}
 
-	log.Warnf("Canceling TM")
-	c.tm.Cancel()
+	if c.uoConn != nil {
+		log.Warnf("Closing uoConn")
+		if err := c.uoConn.Close(); err != nil {
+			return fmt.Errorf("water: (*RuntimeConnV0).uoConn.Close returned error: %w", err)
+		}
+	}
+
 	log.Warnf("Defering TM")
 	c.tm.DeferAll()
 	log.Warnf("Cleaning TM")
 	c.tm.Cleanup()
-
-	if c.uoConn != nil {
-		log.Warnf("Closing uoConn")
-		return c.uoConn.Close()
-	}
+	log.Warnf("Canceling TM")
+	c.tm.Cancel()
+	log.Warnf("TM canceled")
 
 	return nil
 }
@@ -241,6 +244,10 @@ func (c *ConnV0) RemoteAddr() net.Addr {
 //
 // It calls to the underlying user-oriented connection's SetDeadline() method.
 func (c *ConnV0) SetDeadline(t time.Time) error {
+	err := c.networkConn.SetDeadline(t)
+	if err != nil {
+		return err
+	}
 	return c.uoConn.SetDeadline(t)
 }
 
@@ -252,6 +259,10 @@ func (c *ConnV0) SetDeadline(t time.Time) error {
 // it is possible for a silently failed network connection to cause the WASM module
 // to hang forever on Read().
 func (c *ConnV0) SetReadDeadline(t time.Time) error {
+	err := c.networkConn.SetReadDeadline(t)
+	if err != nil {
+		return err
+	}
 	return c.uoConn.SetReadDeadline(t)
 }
 
@@ -259,5 +270,9 @@ func (c *ConnV0) SetReadDeadline(t time.Time) error {
 //
 // It calls to the underlying user-oriented connection's SetWriteDeadline() method.
 func (c *ConnV0) SetWriteDeadline(t time.Time) error {
+	err := c.networkConn.SetWriteDeadline(t)
+	if err != nil {
+		return err
+	}
 	return c.uoConn.SetWriteDeadline(t)
 }

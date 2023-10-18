@@ -30,8 +30,8 @@ func main() {
 	}
 	// configuring the standard out of the WebAssembly instance to inherit
 	// from the parent process
-	config.WASIConfig().InheritStdout()
-	config.WASIConfig().InheritStderr()
+	// config.WASIConfig().InheritStdout()
+	// config.WASIConfig().InheritStderr()
 
 	lis, err := water.NewListener(config, "tcp", localAddr)
 	if err != nil {
@@ -66,9 +66,11 @@ func handleConn(peer string, conn net.Conn) {
 		defer close(chanMsgRecv)
 		buf := make([]byte, 1024) // 1 KiB
 		for {
+			conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 			n, err := conn.Read(buf)
 			if err != nil {
 				log.Warnf("read %s: error %v, tearing down connection...", peer, err)
+				conn.Close()
 				return
 			}
 			chanMsgRecv <- buf[:n]
