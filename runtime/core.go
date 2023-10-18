@@ -1,4 +1,4 @@
-package interfaces
+package runtime
 
 import (
 	"github.com/bytecodealliance/wasmtime-go/v13"

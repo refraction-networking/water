@@ -5,7 +5,7 @@ import (
 
 	"github.com/bytecodealliance/wasmtime-go/v13"
 	"github.com/gaukas/water/config"
-	"github.com/gaukas/water/interfaces"
+	"github.com/gaukas/water/runtime"
 )
 
 // core provides the WASM runtime base and is an internal struct
@@ -32,11 +32,11 @@ type core struct {
 	instance *wasmtime.Instance
 }
 
-// Core creates a new Core with the given config.
+// NewCore creates a new Core with the given config.
 //
 // It uses the default implementation of interface.Core as
 // defined in this file.
-func Core(config *config.Config) (interfaces.Core, error) {
+func NewCore(config *config.Config) (runtime.Core, error) {
 	c := &core{
 		config: config,
 	}

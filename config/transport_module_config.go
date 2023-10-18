@@ -6,13 +6,13 @@ import (
 	"github.com/gaukas/water/internal/log"
 )
 
-// WATMConfig defines the configuration file used by the WebAssembly Transport Module.
-type WATMConfig struct {
+// TMConfig defines the configuration file used by the WebAssembly Transport Module.
+type TMConfig struct {
 	FilePath string // Path to the config file.
 }
 
 // File opens the config file and returns the file descriptor.
-func (c *WATMConfig) File() *os.File {
+func (c *TMConfig) File() *os.File {
 	if c.FilePath == "" {
 		log.Errorf("water: WASM config file path is not provided in config")
 		return nil

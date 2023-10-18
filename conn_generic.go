@@ -3,11 +3,11 @@ package water
 import (
 	"fmt"
 
-	"github.com/gaukas/water/interfaces"
+	"github.com/gaukas/water/runtime"
 )
 
-type coreDial = func(core interfaces.Core, network, address string) (interfaces.Conn, error)
-type coreAccept = func(core interfaces.Core) (interfaces.Conn, error)
+type coreDial = func(core runtime.Core, network, address string) (runtime.Conn, error)
+type coreAccept = func(core runtime.Core) (runtime.Conn, error)
 
 var (
 	mapCoreDial   = make(map[string]coreDial)
@@ -30,7 +30,7 @@ func RegisterAccept(version string, accept coreAccept) error {
 	return nil
 }
 
-func DialVersion(core interfaces.Core, network, address string) (interfaces.Conn, error) {
+func DialVersion(core runtime.Core, network, address string) (runtime.Conn, error) {
 	for _, export := range core.Module().Exports() {
 		if f, ok := mapCoreDial[export.Name()]; ok {
 			return f(core, network, address)
@@ -39,7 +39,7 @@ func DialVersion(core interfaces.Core, network, address string) (interfaces.Conn
 	return nil, fmt.Errorf("water: core loaded a WASM module that does not implement any known version")
 }
 
-func AcceptVersion(core interfaces.Core) (interfaces.Conn, error) {
+func AcceptVersion(core runtime.Core) (runtime.Conn, error) {
 	for _, export := range core.Module().Exports() {
 		if f, ok := mapCoreAccept[export.Name()]; ok {
 			return f(core)

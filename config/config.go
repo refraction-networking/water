@@ -8,11 +8,11 @@ import (
 
 // Config defines the configuration for the WATER Dialer/Config interface.
 type Config struct {
-	// WATMBin contains the binary format of the WebAssembly Transport Module.
+	// TMBin contains the binary format of the WebAssembly Transport Module.
 	// In a typical use case, this mandatory field is populated by loading
 	// from a .wasm file, downloaded from a remote target, or generated from
 	// a .wat (WebAssembly Text Format) file.
-	WATMBin []byte
+	TMBin []byte
 
 	// DialerFunc specifies a func that dials the specified address on the
 	// named network. This optional field can be set to override the Go
@@ -27,9 +27,9 @@ type Config struct {
 	// ListenConfig().
 	NetworkListener net.Listener
 
-	// WATMConfig optionally provides a configuration file to be pushed into
+	// TMConfig optionally provides a configuration file to be pushed into
 	// the WASM Transport Module.
-	WATMConfig WATMConfig
+	TMConfig TMConfig
 
 	// wasiConfigFactory is used to replicate the WASI config for each WASM
 	// instance created. This field is for advanced use cases and/or debugging
@@ -46,14 +46,14 @@ func (c *Config) Clone() *Config {
 		return nil
 	}
 
-	wasmClone := make([]byte, len(c.WATMBin))
-	copy(wasmClone, c.WATMBin)
+	wasmClone := make([]byte, len(c.TMBin))
+	copy(wasmClone, c.TMBin)
 
 	return &Config{
-		WATMBin:           c.WATMBin,
+		TMBin:             c.TMBin,
 		DialerFunc:        c.DialerFunc,
 		NetworkListener:   c.NetworkListener,
-		WATMConfig:        c.WATMConfig,
+		TMConfig:          c.TMConfig,
 		wasiConfigFactory: c.wasiConfigFactory.Clone(),
 	}
 }
@@ -75,11 +75,11 @@ func (c *Config) NetworkListenerOrPanic() net.Listener {
 }
 
 func (c *Config) WATMBinOrPanic() []byte {
-	if len(c.WATMBin) == 0 {
+	if len(c.TMBin) == 0 {
 		panic("water: WebAssembly Transport Module binary is not provided in config")
 	}
 
-	return c.WATMBin
+	return c.TMBin
 }
 
 func (c *Config) WASIConfig() *wasm.WASIConfigFactory {

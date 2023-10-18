@@ -1,6 +1,6 @@
 //go:build !nov0
 
-package water
+package v0
 
 import (
 	"errors"
@@ -9,15 +9,16 @@ import (
 	"net"
 	"time"
 
-	"github.com/gaukas/water/interfaces"
+	"github.com/gaukas/water"
 	"github.com/gaukas/water/internal/log"
 	"github.com/gaukas/water/internal/socket"
 	v0 "github.com/gaukas/water/internal/v0"
+	"github.com/gaukas/water/runtime"
 )
 
 func init() {
-	RegisterDial("_v0", DialV0)     // Registering the dialer function to WATER library
-	RegisterAccept("_v0", AcceptV0) // Registering the accept function to WATER library
+	water.RegisterDial("_v0plus", DialV0)     // Registering the dialer function to WATER library
+	water.RegisterAccept("_v0plus", AcceptV0) // Registering the accept function to WATER library
 }
 
 // ConnV0 is the first version of RuntimeConn.
@@ -27,12 +28,12 @@ type ConnV0 struct {
 
 	tm *v0.TransportModule
 
-	interfaces.UnimplementedConn // embedded to ensure forward compatibility
+	runtime.UnimplementedConn // embedded to ensure forward compatibility
 }
 
 // DialV0 dials the network address using through the WASM module
 // while using the dialerFunc specified in core.config.
-func DialV0(core interfaces.Core, network, address string) (c interfaces.Conn, err error) {
+func DialV0(core runtime.Core, network, address string) (c runtime.Conn, err error) {
 	tm := v0.Core2TransportModule(core)
 	conn := &ConnV0{
 		tm: tm,
@@ -50,6 +51,7 @@ func DialV0(core interfaces.Core, network, address string) (c interfaces.Conn, e
 
 	var wasmCallerConn net.Conn
 	wasmCallerConn, conn.uoConn, err = socket.UnixConnPair()
+	// wasmCallerConn, conn.uoConn, err = socket.TCPConnPair()
 	if err != nil {
 		if wasmCallerConn == nil || conn.uoConn == nil {
 			return nil, fmt.Errorf("water: socket.UnixConnPair returned error: %w", err)
@@ -67,11 +69,14 @@ func DialV0(core interfaces.Core, network, address string) (c interfaces.Conn, e
 		return nil, err
 	}
 
+	log.Infof("water: DialV0: conn.tm.Worker() returned")
+
 	// safety: we need to watch for the blocking worker thread's status.
 	// If it returns, no further data can be processed by the WASM module
 	// and we need to close this connection in that case.
 	go func() {
 		<-conn.tm.WorkerErrored()
+		log.Warnf("water: DialV0: worker thread errored")
 		conn.Close()
 	}()
 
@@ -80,7 +85,7 @@ func DialV0(core interfaces.Core, network, address string) (c interfaces.Conn, e
 
 // AcceptV0 accepts the network connection using through the WASM module
 // while using the net.Listener specified in core.config.
-func AcceptV0(core interfaces.Core) (c interfaces.Conn, err error) {
+func AcceptV0(core runtime.Core) (c runtime.Conn, err error) {
 	tm := v0.Core2TransportModule(core)
 	conn := &ConnV0{
 		tm: tm,
@@ -124,7 +129,7 @@ func AcceptV0(core interfaces.Core) (c interfaces.Conn, err error) {
 	return conn, nil
 }
 
-func RelayV0(core interfaces.Core, network, address string) (c interfaces.Conn, err error) {
+func RelayV0(core runtime.Core, network, address string) (c runtime.Conn, err error) {
 	tm := v0.Core2TransportModule(core)
 	conn := &ConnV0{
 		tm: tm,
@@ -197,17 +202,21 @@ func (c *ConnV0) Write(b []byte) (n int, err error) {
 // It will close both the network connection AND the WASM module, then
 // the user-facing net.Conn will be closed.
 func (c *ConnV0) Close() error {
-	if c.networkConn == nil {
+	if c.networkConn != nil {
 		if err := c.networkConn.Close(); err != nil {
 			return fmt.Errorf("water: (*RuntimeConnV0).netConn.Close returned error: %w", err)
 		}
 	}
 
+	log.Warnf("Canceling TM")
 	c.tm.Cancel()
+	log.Warnf("Defering TM")
 	c.tm.DeferAll()
+	log.Warnf("Cleaning TM")
 	c.tm.Cleanup()
 
 	if c.uoConn != nil {
+		log.Warnf("Closing uoConn")
 		return c.uoConn.Close()
 	}
 

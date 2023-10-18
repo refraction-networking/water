@@ -9,15 +9,15 @@ import (
 
 func TestConfigClone(t *testing.T) {
 	c := &Config{
-		WATMBin:         make([]byte, 256),
+		TMBin:           make([]byte, 256),
 		DialerFunc:      nil, // functions aren't deeply equal unless nil
 		NetworkListener: &net.TCPListener{},
-		WATMConfig: WATMConfig{
+		TMConfig: TMConfig{
 			FilePath: "/tmp/watm.toml",
 		},
 	}
 
-	rand.Read(c.WATMBin)
+	rand.Read(c.TMBin)
 
 	ccloned := c.Clone()
 

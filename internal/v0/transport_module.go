@@ -10,17 +10,18 @@ import (
 	"sync"
 
 	"github.com/bytecodealliance/wasmtime-go/v13"
-	"github.com/gaukas/water/interfaces"
+	"github.com/gaukas/water/internal/log"
 	"github.com/gaukas/water/internal/socket"
 	"github.com/gaukas/water/internal/system"
 	"github.com/gaukas/water/internal/wasm"
+	waterruntime "github.com/gaukas/water/runtime"
 )
 
 // TransportModule acts like a "managed core". It was build to provide WebAssembly
 // Transport Module API-facing functions and utilities that are exclusive to
 // version 0.
 type TransportModule struct {
-	core interfaces.Core
+	core waterruntime.Core
 
 	_init *wasmtime.Func // _init() -> i32
 
@@ -95,12 +96,13 @@ type TransportModule struct {
 		conn net.Conn
 		file *os.File
 	}
+	pushedConnMutex *sync.RWMutex
 
 	deferOnce     *sync.Once
 	deferredFuncs []func()
 }
 
-func Core2TransportModule(core interfaces.Core) *TransportModule {
+func Core2TransportModule(core waterruntime.Core) *TransportModule {
 	wasm := &TransportModule{
 		core:      core,
 		gcfixOnce: new(sync.Once),
@@ -108,8 +110,9 @@ func Core2TransportModule(core interfaces.Core) *TransportModule {
 			conn net.Conn
 			file *os.File
 		}),
-		deferOnce:     new(sync.Once),
-		deferredFuncs: make([]func(), 0),
+		pushedConnMutex: new(sync.RWMutex),
+		deferOnce:       new(sync.Once),
+		deferredFuncs:   make([]func(), 0),
 	}
 
 	// SetFinalizer, so Go GC automatically cleans up the WASM runtime
@@ -256,7 +259,7 @@ func (tm *TransportModule) Initialize() error {
 	}{
 		_cancel_with:  _cancel_with,
 		_worker:       _worker,
-		chanWorkerErr: make(chan error, 4), // at max 1 error would occur, but we will write multiple copies
+		chanWorkerErr: make(chan error, 8), // at max 1 error would occur, but we will write multiple copies
 		// cancelSocket:  nil,
 	}
 
@@ -384,6 +387,8 @@ func (tm *TransportModule) Worker() error {
 		return fmt.Errorf("water: _cancel_with returned error: %w", wasm.WASMErr(ret.(int32)))
 	}
 
+	log.Infof("water: starting worker thread")
+
 	// in a goroutine, call _worker
 	go func() {
 		defer close(tm.backgroundWorker.chanWorkerErr)
@@ -403,13 +408,17 @@ func (tm *TransportModule) Worker() error {
 			tm.backgroundWorker.chanWorkerErr <- wasm.WASMErr(ret.(int32))
 			tm.backgroundWorker.chanWorkerErr <- wasm.WASMErr(ret.(int32))
 		}
+		log.Warnf("water: worker thread exited with code %d", ret.(int32))
 	}()
+
+	log.Infof("water: worker thread started")
 
 	// last sanity check if the worker thread crashed immediately even before we return
 	select {
 	case err := <-tm.backgroundWorker.chanWorkerErr: // if already returned, basically it failed to start
 		return fmt.Errorf("water: worker thread returned error: %w", err)
 	default:
+		log.Debugf("water: Worker (func, not the worker thread) returning")
 		return nil
 	}
 }
@@ -480,7 +489,7 @@ func (tm *TransportModule) PushConn(conn net.Conn, wasiCtxOverride ...wasiCtx) (
 	}
 
 	tm.gcfixOnce.Do(func() {
-		if system.GC {
+		if system.GCBUG {
 			// create temp file
 			var f *os.File
 			f, err = os.CreateTemp("", "water-gcfix")
@@ -495,6 +504,7 @@ func (tm *TransportModule) PushConn(conn net.Conn, wasiCtxOverride ...wasiCtx) (
 			}
 
 			// save dummy file to map
+			tm.pushedConnMutex.Lock()
 			tm.pushedConn[int32(fd)] = &struct {
 				conn net.Conn
 				file *os.File
@@ -502,6 +512,9 @@ func (tm *TransportModule) PushConn(conn net.Conn, wasiCtxOverride ...wasiCtx) (
 				conn: nil,
 				file: f,
 			}
+			tm.pushedConnMutex.Unlock()
+
+			log.Infof("water: GC fix: pushed dummy file to WASM store with fd %d", fd)
 		}
 	})
 
@@ -520,6 +533,7 @@ func (tm *TransportModule) PushConn(conn net.Conn, wasiCtxOverride ...wasiCtx) (
 	}
 	fd = int32(fdu32)
 
+	tm.pushedConnMutex.Lock()
 	tm.pushedConn[fd] = &struct {
 		conn net.Conn
 		file *os.File
@@ -527,6 +541,7 @@ func (tm *TransportModule) PushConn(conn net.Conn, wasiCtxOverride ...wasiCtx) (
 		conn: conn,
 		file: connFile,
 	}
+	tm.pushedConnMutex.Unlock()
 
 	return fd, nil
 }
@@ -546,6 +561,7 @@ func (tm *TransportModule) Defer(f func()) {
 func (tm *TransportModule) Cleanup() {
 	// clean up pushed files
 	var keyList []int32
+	tm.pushedConnMutex.Lock()
 	for k, v := range tm.pushedConn {
 		if v != nil {
 			if v.file != nil {
@@ -562,6 +578,7 @@ func (tm *TransportModule) Cleanup() {
 	for _, k := range keyList {
 		delete(tm.pushedConn, k)
 	}
+	tm.pushedConnMutex.Unlock()
 
 	// clean up deferred functions
 	tm.deferredFuncs = nil
@@ -569,7 +586,7 @@ func (tm *TransportModule) Cleanup() {
 
 func (tm *TransportModule) pushConfig(caller *wasmtime.Caller) (int32, error) {
 	// get config file
-	configFile := tm.core.Config().WATMConfig.File()
+	configFile := tm.core.Config().TMConfig.File()
 	if configFile == nil {
 		return wasm.INVALID_FD, nil // we don't return error here so no trap is triggered
 	}
@@ -584,6 +601,8 @@ func (tm *TransportModule) pushConfig(caller *wasmtime.Caller) (int32, error) {
 }
 
 func (tm *TransportModule) GetPushedConn(fd int32) net.Conn {
+	tm.pushedConnMutex.RLock()
+	defer tm.pushedConnMutex.RUnlock()
 	if tm.pushedConn == nil {
 		return nil
 	}

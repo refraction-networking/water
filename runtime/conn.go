@@ -1,4 +1,4 @@
-package interfaces
+package runtime
 
 import (
 	"fmt"
@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// Conn is an abstracted connection interface which encapsulates
-// a WASM runtime core.
+// Conn is an abstracted connection interface which is expected
+// to encapsulate a Core.
 type Conn interface {
 	net.Conn
 

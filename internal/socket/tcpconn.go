@@ -6,8 +6,13 @@ import (
 	"sync"
 )
 
-func TCPConnPair(address string) (c1, c2 net.Conn, err error) {
-	l, err := net.Listen("tcp", address)
+func TCPConnPair(address ...string) (c1, c2 net.Conn, err error) {
+	var tcpAddr string = ":0"
+	if len(address) > 0 {
+		tcpAddr = address[0]
+	}
+
+	l, err := net.Listen("tcp", tcpAddr)
 	if err != nil {
 		return nil, nil, fmt.Errorf("net.Listen returned error: %w", err)
 	}

@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/gaukas/water/config"
-	"github.com/gaukas/water/interfaces"
+	"github.com/gaukas/water/runtime"
 )
 
 // Listener listens on a local network address and upon caller
@@ -85,9 +85,9 @@ func (l *Listener) Accept() (net.Conn, error) {
 		return nil, fmt.Errorf("water: dialing with nil config is not allowed")
 	}
 
-	var core interfaces.Core
+	var core runtime.Core
 	var err error
-	core, err = Core(l.Config)
+	core, err = NewCore(l.Config)
 	if err != nil {
 		return nil, err
 	}
