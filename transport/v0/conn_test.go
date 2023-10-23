@@ -15,10 +15,8 @@ import (
 	_ "github.com/gaukas/water/transport/v0"
 )
 
-var (
-	// hexencoder_v0 []byte
-	plain_v0 []byte
-)
+// hexencoder_v0 []byte
+var plain_v0 []byte
 
 func BenchmarkConnV0(b *testing.B) {
 	// read file into plain_v0
