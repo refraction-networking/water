@@ -414,7 +414,6 @@ func (tm *TransportModule) Worker() error {
 		} else {
 			log.Debugf("water: worker thread exited with code 0")
 		}
-
 	}()
 
 	log.Debugf("water: worker thread started")
