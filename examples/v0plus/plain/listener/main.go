@@ -25,15 +25,15 @@ func main() {
 
 	// start using W.A.T.E.R. API below this line, have fun!
 	config := &water.Config{
-		TMBin:      wasm,
-		DialerFunc: net.Dial, // optional field, defaults to net.Dial
+		TMBin: wasm,
+		// NetworkDialerFunc: net.Dial, // optional field, defaults to net.Dial
 	}
 	// configuring the standard out of the WebAssembly instance to inherit
 	// from the parent process
-	// config.WASIConfig().InheritStdout()
-	// config.WASIConfig().InheritStderr()
+	config.WASIConfig().InheritStdout()
+	config.WASIConfig().InheritStderr()
 
-	lis, err := water.NewListener(config, "tcp", localAddr)
+	lis, err := config.Listen("tcp", localAddr)
 	if err != nil {
 		panic(fmt.Sprintf("failed to listen: %v", err))
 	}
@@ -66,7 +66,7 @@ func handleConn(peer string, conn net.Conn) {
 		defer close(chanMsgRecv)
 		buf := make([]byte, 1024) // 1 KiB
 		for {
-			conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+			// conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 			n, err := conn.Read(buf)
 			if err != nil {
 				log.Warnf("read %s: error %v, tearing down connection...", peer, err)

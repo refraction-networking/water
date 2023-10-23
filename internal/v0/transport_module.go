@@ -10,18 +10,18 @@ import (
 	"sync"
 
 	"github.com/bytecodealliance/wasmtime-go/v13"
+	"github.com/gaukas/water"
 	"github.com/gaukas/water/internal/log"
 	"github.com/gaukas/water/internal/socket"
 	"github.com/gaukas/water/internal/system"
 	"github.com/gaukas/water/internal/wasm"
-	waterruntime "github.com/gaukas/water/runtime"
 )
 
 // TransportModule acts like a "managed core". It was build to provide WebAssembly
 // Transport Module API-facing functions and utilities that are exclusive to
 // version 0.
 type TransportModule struct {
-	core waterruntime.Core
+	core water.Core
 
 	_init *wasmtime.Func // _init() -> i32
 
@@ -93,8 +93,8 @@ type TransportModule struct {
 
 	gcfixOnce  *sync.Once
 	pushedConn map[int32]*struct {
-		conn net.Conn
-		file *os.File
+		groundTruthConn net.Conn // the conn we want to keep alive
+		pushedFile      *os.File // the file we actually pushed to WebAssembly world also needs to be kept alive
 	}
 	pushedConnMutex *sync.RWMutex
 
@@ -102,13 +102,13 @@ type TransportModule struct {
 	deferredFuncs []func()
 }
 
-func Core2TransportModule(core waterruntime.Core) *TransportModule {
+func Core2TransportModule(core water.Core) *TransportModule {
 	wasm := &TransportModule{
 		core:      core,
 		gcfixOnce: new(sync.Once),
 		pushedConn: make(map[int32]*struct {
-			conn net.Conn
-			file *os.File
+			groundTruthConn net.Conn
+			pushedFile      *os.File
 		}),
 		pushedConnMutex: new(sync.RWMutex),
 		deferOnce:       new(sync.Once),
@@ -215,39 +215,39 @@ func (tm *TransportModule) Initialize() error {
 	}
 
 	// _init
-	tm._init = tm.core.Instance().GetFunc(tm.core.Store(), "_init")
+	tm._init = tm.core.Instance().GetFunc(tm.core.Store(), "_water_init")
 	if tm._init == nil {
-		return fmt.Errorf("water: WASM module does not export _init")
+		return fmt.Errorf("water: WASM module does not export _water_init")
 	}
 
 	// _dial
-	tm._dial = tm.core.Instance().GetFunc(tm.core.Store(), "_dial")
+	tm._dial = tm.core.Instance().GetFunc(tm.core.Store(), "_water_dial")
 	// if tm._dial == nil {
 	// 	return fmt.Errorf("water: WASM module does not export _dial")
 	// }
 
 	// _accept
-	tm._accept = tm.core.Instance().GetFunc(tm.core.Store(), "_accept")
+	tm._accept = tm.core.Instance().GetFunc(tm.core.Store(), "_water_accept")
 	// if tm._accept == nil {
 	// 	return fmt.Errorf("water: WASM module does not export _accept")
 	// }
 
 	// _associate
-	tm._associate = tm.core.Instance().GetFunc(tm.core.Store(), "_associate")
+	tm._associate = tm.core.Instance().GetFunc(tm.core.Store(), "_water_associate")
 	// if tm._associate == nil {
 	// 	return fmt.Errorf("water: WASM module does not export _associate")
 	// }
 
 	// _cancel_with
-	_cancel_with := tm.core.Instance().GetFunc(tm.core.Store(), "_cancel_with")
+	_cancel_with := tm.core.Instance().GetFunc(tm.core.Store(), "_water_cancel_with")
 	if _cancel_with == nil {
-		return fmt.Errorf("water: WASM module does not export _cancel_with")
+		return fmt.Errorf("water: WASM module does not export _water_cancel_with")
 	}
 
 	// _worker
-	_worker := tm.core.Instance().GetFunc(tm.core.Store(), "_worker")
+	_worker := tm.core.Instance().GetFunc(tm.core.Store(), "_water_worker")
 	if _worker == nil {
-		return fmt.Errorf("water: WASM module does not export _worker")
+		return fmt.Errorf("water: WASM module does not export _water_worker")
 	}
 
 	// wrap _cancel_with and _worker
@@ -266,7 +266,7 @@ func (tm *TransportModule) Initialize() error {
 	// call _init
 	ret, err := tm._init.Call(tm.core.Store())
 	if err != nil {
-		return fmt.Errorf("water: calling _init function returned error: %w", err)
+		return fmt.Errorf("water: calling _water_init function returned error: %w", err)
 	}
 
 	return wasm.WASMErr(ret.(int32))
@@ -274,13 +274,16 @@ func (tm *TransportModule) Initialize() error {
 
 // DialFrom is used to make the Transport Module act as a dialer and
 // dial a network connection.
-func (tm *TransportModule) DialFrom(callerConn net.Conn) (destConn net.Conn, err error) {
+//
+// Takes the reverse caller connection as an argument, which is used
+// to communicate with the caller.
+func (tm *TransportModule) DialFrom(reverseCallerConn net.Conn) (destConn net.Conn, err error) {
 	// check if _dial is exported
 	if tm._dial == nil {
-		return nil, fmt.Errorf("water: WASM module does not export _dial")
+		return nil, fmt.Errorf("water: WASM module does not export _water_dial")
 	}
 
-	callerFd, err := tm.PushConn(callerConn)
+	callerFd, err := tm.PushConn(reverseCallerConn)
 	if err != nil {
 		return nil, fmt.Errorf("water: pushing caller conn to store failed: %w", err)
 	}
@@ -307,13 +310,13 @@ func (tm *TransportModule) DialFrom(callerConn net.Conn) (destConn net.Conn, err
 
 // AcceptFor is used to make the Transport Module act as a listener and
 // accept a network connection.
-func (tm *TransportModule) AcceptFor(callerConn net.Conn) (sourceConn net.Conn, err error) {
+func (tm *TransportModule) AcceptFor(reverseCallerConn net.Conn) (sourceConn net.Conn, err error) {
 	// check if _accept is exported
 	if tm._accept == nil {
-		return nil, fmt.Errorf("water: WASM module does not export _accept")
+		return nil, fmt.Errorf("water: WASM module does not export _water_accept")
 	}
 
-	callerFd, err := tm.PushConn(callerConn)
+	callerFd, err := tm.PushConn(reverseCallerConn)
 	if err != nil {
 		return nil, fmt.Errorf("water: pushing caller conn to store failed: %w", err)
 	}
@@ -344,7 +347,7 @@ func (tm *TransportModule) AcceptFor(callerConn net.Conn) (sourceConn net.Conn, 
 func (tm *TransportModule) Associate() error {
 	// check if _associate is exported
 	if tm._associate == nil {
-		return fmt.Errorf("water: WASM module does not export _associate")
+		return fmt.Errorf("water: WASM module does not export _water_associate")
 	}
 
 	ret, err := tm._associate.Call(tm.core.Store())
@@ -381,13 +384,13 @@ func (tm *TransportModule) Worker() error {
 	// pass the fd to the WASM module
 	ret, err := tm.backgroundWorker._cancel_with.Call(tm.core.Store(), cancelPipeFd)
 	if err != nil {
-		return fmt.Errorf("water: calling _cancel_with function returned error: %w", err)
+		return fmt.Errorf("water: calling _water_cancel_with function returned error: %w", err)
 	}
 	if ret.(int32) != 0 {
-		return fmt.Errorf("water: _cancel_with returned error: %w", wasm.WASMErr(ret.(int32)))
+		return fmt.Errorf("water: _water_cancel_with returned error: %w", wasm.WASMErr(ret.(int32)))
 	}
 
-	log.Infof("water: starting worker thread")
+	log.Debugf("water: starting worker thread")
 
 	// in a goroutine, call _worker
 	go func() {
@@ -407,11 +410,14 @@ func (tm *TransportModule) Worker() error {
 			tm.backgroundWorker.chanWorkerErr <- wasm.WASMErr(ret.(int32))
 			tm.backgroundWorker.chanWorkerErr <- wasm.WASMErr(ret.(int32))
 			tm.backgroundWorker.chanWorkerErr <- wasm.WASMErr(ret.(int32))
+			log.Warnf("water: worker thread exited with code %d", ret.(int32))
+		} else {
+			log.Debugf("water: worker thread exited with code 0")
 		}
-		log.Warnf("water: worker thread exited with code %d", ret.(int32))
+
 	}()
 
-	log.Infof("water: worker thread started")
+	log.Debugf("water: worker thread started")
 
 	// last sanity check if the worker thread crashed immediately even before we return
 	select {
@@ -489,7 +495,7 @@ func (tm *TransportModule) PushConn(conn net.Conn, wasiCtxOverride ...wasiCtx) (
 	}
 
 	tm.gcfixOnce.Do(func() {
-		if system.GCBUG {
+		if system.GC_BUG {
 			// create temp file
 			var f *os.File
 			f, err = os.CreateTemp("", "water-gcfix")
@@ -506,15 +512,15 @@ func (tm *TransportModule) PushConn(conn net.Conn, wasiCtxOverride ...wasiCtx) (
 			// save dummy file to map
 			tm.pushedConnMutex.Lock()
 			tm.pushedConn[int32(fd)] = &struct {
-				conn net.Conn
-				file *os.File
+				groundTruthConn net.Conn
+				pushedFile      *os.File
 			}{
-				conn: nil,
-				file: f,
+				groundTruthConn: nil,
+				pushedFile:      f,
 			}
 			tm.pushedConnMutex.Unlock()
 
-			log.Infof("water: GC fix: pushed dummy file to WASM store with fd %d", fd)
+			log.Debugf("water: GC fix: pushed dummy file to WASM store with fd %d", fd)
 		}
 	})
 
@@ -522,7 +528,17 @@ func (tm *TransportModule) PushConn(conn net.Conn, wasiCtxOverride ...wasiCtx) (
 		return wasm.INVALID_FD, fmt.Errorf("water: creating temp file for GC fix: %w", err)
 	}
 
-	connFile, err := socket.AsFile(conn)
+	var connFile *os.File
+	if system.CONN_HALT_BUG { // if the bug needs to be worked around, we use a unix socket to forward all tcp streams
+		switch conn.(type) {
+		case *net.TCPConn:
+			connFile, err = socket.UnixConnFileWrap(conn)
+		default:
+			connFile, err = socket.AsFile(conn)
+		}
+	} else {
+		connFile, err = socket.AsFile(conn)
+	}
 	if err != nil {
 		return wasm.INVALID_FD, fmt.Errorf("water: converting conn to file failed: %w", err)
 	}
@@ -535,11 +551,11 @@ func (tm *TransportModule) PushConn(conn net.Conn, wasiCtxOverride ...wasiCtx) (
 
 	tm.pushedConnMutex.Lock()
 	tm.pushedConn[fd] = &struct {
-		conn net.Conn
-		file *os.File
+		groundTruthConn net.Conn
+		pushedFile      *os.File
 	}{
-		conn: conn,
-		file: connFile,
+		groundTruthConn: conn,
+		pushedFile:      connFile,
 	}
 	tm.pushedConnMutex.Unlock()
 
@@ -564,13 +580,13 @@ func (tm *TransportModule) Cleanup() {
 	tm.pushedConnMutex.Lock()
 	for k, v := range tm.pushedConn {
 		if v != nil {
-			if v.file != nil {
-				v.file.Close()
-				v.file = nil
+			if v.pushedFile != nil {
+				v.pushedFile.Close()
+				v.pushedFile = nil
 			}
-			if v.conn != nil {
-				v.conn.Close()
-				v.conn = nil
+			if v.groundTruthConn != nil {
+				v.groundTruthConn.Close()
+				v.groundTruthConn = nil
 			}
 		}
 		keyList = append(keyList, k)
@@ -607,7 +623,7 @@ func (tm *TransportModule) GetPushedConn(fd int32) net.Conn {
 		return nil
 	}
 	if v, ok := tm.pushedConn[fd]; ok {
-		return v.conn
+		return v.groundTruthConn
 	}
 	return nil
 }

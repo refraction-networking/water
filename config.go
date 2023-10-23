@@ -1,4 +1,4 @@
-package config
+package water
 
 import (
 	"net"
@@ -14,17 +14,17 @@ type Config struct {
 	// a .wat (WebAssembly Text Format) file.
 	TMBin []byte
 
-	// DialerFunc specifies a func that dials the specified address on the
+	// NetworkDialerFunc specifies a func that dials the specified address on the
 	// named network. This optional field can be set to override the Go
 	// default dialer func:
 	// 	net.Dial(network, address)
-	DialerFunc func(network, address string) (net.Conn, error)
+	NetworkDialerFunc func(network, address string) (net.Conn, error)
 
 	// NetworkListener specifies a net.listener implementation that listens
 	// on the specified address on the named network. This optional field
 	// will be used to provide (incoming) network connections from a
 	// presumably remote source to the WASM instance. Required by
-	// ListenConfig().
+	// water.WrapListener().
 	NetworkListener net.Listener
 
 	// TMConfig optionally provides a configuration file to be pushed into
@@ -41,6 +41,7 @@ type Config struct {
 	wasiConfigFactory *wasm.WASIConfigFactory
 }
 
+// Clone creates a deep copy of the Config.
 func (c *Config) Clone() *Config {
 	if c == nil {
 		return nil
@@ -51,21 +52,25 @@ func (c *Config) Clone() *Config {
 
 	return &Config{
 		TMBin:             c.TMBin,
-		DialerFunc:        c.DialerFunc,
+		NetworkDialerFunc: c.NetworkDialerFunc,
 		NetworkListener:   c.NetworkListener,
 		TMConfig:          c.TMConfig,
 		wasiConfigFactory: c.wasiConfigFactory.Clone(),
 	}
 }
 
-func (c *Config) DialerFuncOrDefault() func(network, address string) (net.Conn, error) {
-	if c.DialerFunc == nil {
+// NetworkDialerFuncOrDefault returns the DialerFunc if it is not nil, otherwise
+// returns the default net.Dial function.
+func (c *Config) NetworkDialerFuncOrDefault() func(network, address string) (net.Conn, error) {
+	if c.NetworkDialerFunc == nil {
 		return net.Dial
 	}
 
-	return c.DialerFunc
+	return c.NetworkDialerFunc
 }
 
+// NetworkListenerOrDefault returns the NetworkListener if it is not nil,
+// otherwise it panics.
 func (c *Config) NetworkListenerOrPanic() net.Listener {
 	if c.NetworkListener == nil {
 		panic("water: network listener is not provided in config")
@@ -74,6 +79,7 @@ func (c *Config) NetworkListenerOrPanic() net.Listener {
 	return c.NetworkListener
 }
 
+// WATMBinOrDefault returns the WATMBin if it is not nil, otherwise it panics.
 func (c *Config) WATMBinOrPanic() []byte {
 	if len(c.TMBin) == 0 {
 		panic("water: WebAssembly Transport Module binary is not provided in config")
@@ -82,10 +88,24 @@ func (c *Config) WATMBinOrPanic() []byte {
 	return c.TMBin
 }
 
+// WASIConfig returns the WASIConfigFactory. If the pointer is
+// nil, a new WASIConfigFactory will be created and returned.
 func (c *Config) WASIConfig() *wasm.WASIConfigFactory {
 	if c.wasiConfigFactory == nil {
 		c.wasiConfigFactory = wasm.NewWasiConfigFactory()
 	}
 
 	return c.wasiConfigFactory
+}
+
+func (c *Config) Listen(network, address string) (net.Listener, error) {
+	lis, err := net.Listen(network, address)
+	if err != nil {
+		return nil, err
+	}
+
+	config := c.Clone()
+	config.NetworkListener = lis
+
+	return NewListener(config)
 }

@@ -4,9 +4,22 @@ import (
 	"fmt"
 
 	"github.com/bytecodealliance/wasmtime-go/v13"
-	"github.com/gaukas/water/config"
-	"github.com/gaukas/water/runtime"
 )
+
+// Core provides the low-level access to the WebAssembly runtime
+// environment.
+//
+// Currently it depends on the wasmtime-go API, but it is subject to
+// change in the future.
+type Core interface {
+	Config() *Config
+	Engine() *wasmtime.Engine
+	Instance() *wasmtime.Instance
+	Linker() *wasmtime.Linker
+	Module() *wasmtime.Module
+	Store() *wasmtime.Store
+	Instantiate() error
+}
 
 // core provides the WASM runtime base and is an internal struct
 // that every RuntimeXxx implementation will embed.
@@ -18,11 +31,10 @@ import (
 // to breaking changes unless a severe bug needs to be fixed
 // in such a breaking manner inevitably.
 //
-// interface.Core is the public interface for core that developers
-// are supposed to use.
+// Implements Core.
 type core struct {
 	// config
-	config *config.Config
+	config *Config
 
 	// wasmtime
 	engine   *wasmtime.Engine
@@ -36,7 +48,7 @@ type core struct {
 //
 // It uses the default implementation of interface.Core as
 // defined in this file.
-func NewCore(config *config.Config) (runtime.Core, error) {
+func NewCore(config *Config) (Core, error) {
 	c := &core{
 		config: config,
 	}
@@ -66,7 +78,7 @@ func NewCore(config *config.Config) (runtime.Core, error) {
 }
 
 // Config returns the Config used to create the Core.
-func (c *core) Config() *config.Config {
+func (c *core) Config() *Config {
 	return c.config
 }
 

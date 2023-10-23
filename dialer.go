@@ -2,73 +2,89 @@ package water
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/gaukas/water/config"
-	"github.com/gaukas/water/runtime"
+	"errors"
 )
 
-// Dialer dials the given network address upon caller calling
-// Dial() and returns a net.Conn which is connected to the
-// WASM module.
+// Dialer dials a remote network address upon caller calling
+// Dial() and returns a net.Conn which is upgraded by the
+// WebAssembly Transport Module.
 //
 // The structure of a Dialer is as follows:
 //
 //	        dial +----------------+ dial
-//	       ----->|     Decode     |------>
-//	Caller       |  WASM Runtime  |        Remote
-//	       <-----| Decode/Encode  |<------
+//	       ----->|        Upgrade |------>
+//	Caller       |   WebAssembly  |        Remote
+//	       <-----| Downgrade      |<------
 //	             +----------------+
 //	                   Dialer
-type Dialer struct {
-	// Config is the configuration for the core.
-	Config *config.Config
+type Dialer interface {
+	Dial(network, address string) (Conn, error)
+	DialContext(ctx context.Context, network, address string) (Conn, error)
+
+	mustEmbedUnimplementedDialer()
 }
 
-func NewDialer(c *config.Config) *Dialer {
-	return &Dialer{
-		Config: c.Clone(),
-	}
-}
+type newDialerFunc func(*Config) (Dialer, error)
 
-// Dialer dials the given network address using the specified dialer
-// in the config. The returned RuntimeConn implements net.Conn and
-// could be seen as the outbound connection with a wrapping transport
-// protocol handled by the WASM module.
+var (
+	knownDialerVersions = make(map[string]newDialerFunc)
+
+	ErrDialerAlreadyRegistered = errors.New("water: dialer already registered")
+	ErrDialerVersionNotFound   = errors.New("water: dialer version not found")
+	ErrUnimplementedDialer     = errors.New("water: unimplemented dialer")
+)
+
+// UnimplementedDialer is a Dialer that always returns errors.
 //
-// Internally, DialContext() is called with a background context.
-func (d *Dialer) Dial(network, address string) (runtime.Conn, error) {
-	return d.DialContext(context.Background(), network, address)
+// It is used to ensure forward compatibility of the Dialer interface.
+type UnimplementedDialer struct{}
+
+// Dial implements Dialer.Dial().
+func (*UnimplementedDialer) Dial(_, _ string) (Conn, error) {
+	return nil, ErrUnimplementedDialer
 }
 
-// DialContext dials the given network address using the specified dialer
-// in the config. The returned RuntimeConn implements net.Conn and
-// could be seen as the outbound connection with a wrapping transport
-// protocol handled by the WASM module.
+// DialContext implements Dialer.DialContext().
+func (*UnimplementedDialer) DialContext(_ context.Context, _, _ string) (Conn, error) {
+	return nil, ErrUnimplementedDialer
+}
+
+// mustEmbedUnimplementedDialer is a function that developers cannot
+// manually implement. It is used to ensure forward compatibility of
+// the Dialer interface.
+func (*UnimplementedDialer) mustEmbedUnimplementedDialer() {}
+
+// RegisterDialer registers a dialer function for the given version to
+// the global registry. Only registered versions can be recognized and
+// used by NewDialer().
+func RegisterDialer(version string, dialer newDialerFunc) error {
+	if _, ok := knownDialerVersions[version]; ok {
+		return ErrDialerAlreadyRegistered
+	}
+	knownDialerVersions[version] = dialer
+	return nil
+}
+
+// NewDialer creates a new Dialer from the config.
 //
-// If the context expires before the connection is complete, an error is
-// returned.
-func (d *Dialer) DialContext(ctx context.Context, network, address string) (conn runtime.Conn, err error) {
-	if d.Config == nil {
-		return nil, fmt.Errorf("water: dialing with nil config is not allowed")
+// It automatically detects the version of the WebAssembly Transport
+// Module specified in the config.
+func NewDialer(c *Config) (Dialer, error) {
+	core, err := NewCore(c)
+	if err != nil {
+		return nil, err
 	}
 
-	ctxReady, dialReady := context.WithCancel(context.Background())
-	go func() {
-		defer dialReady()
-		var core runtime.Core
-		core, err = NewCore(d.Config)
-		if err != nil {
-			return
+	// Search through all exported names and match them to potential
+	// Dialer versions.
+	//
+	// TODO: detect the version of the WebAssembly Transport Module
+	// in a more organized way.
+	for _, export := range core.Module().Exports() {
+		if f, ok := knownDialerVersions[export.Name()]; ok {
+			return f(c)
 		}
-
-		conn, err = DialVersion(core, network, address)
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-ctxReady.Done():
-		return conn, err
 	}
+
+	return nil, ErrDialerVersionNotFound
 }

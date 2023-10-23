@@ -1,113 +1,99 @@
 package water
 
 import (
-	"fmt"
+	"errors"
 	"net"
-	"sync/atomic"
-
-	"github.com/gaukas/water/config"
-	"github.com/gaukas/water/runtime"
 )
 
 // Listener listens on a local network address and upon caller
 // calling Accept(), it accepts an incoming connection and
-// passes it to the WASM module, which returns a net.Conn to
-// caller.
+// returns the net.Conn upgraded by the WebAssembly Transport
+// Module.
 //
 // The structure of a Listener is as follows:
 //
 //	            +---------------+ accept +---------------+ accept
-//	       ---->|               |------->|     Decode    |------->
-//	Source      |  net.Listener |        |  WASM Runtime |         Caller
-//	       <----|               |<-------| Decode/Encode |<-------
+//	       ---->|               |------->|     Downgrade |------->
+//	Source      |  net.Listener |        |  WebAssembly  |         Caller
+//	       <----|               |<-------| Upgrade       |<-------
 //	            +---------------+        +---------------+
 //	                     \                      /
 //	                      \------Listener------/
 //
 // As shown above, a Listener consists of a net.Listener to accept
-// incoming connections and a WASM runtime to handle the incoming
-// connections from an external source. The WASM runtime will return
-// a net.Conn that caller can Read() from or Write() to.
-//
-// The WASM module used by a Listener must implement a WASMListener.
-type Listener struct {
-	Config *config.Config
-	closed *atomic.Bool
+// incoming connections and a WATM to handle the incoming connections
+// from an external source. Accept() returns a net.Conn that caller
+// can Read()-from or Write()-to.
+type Listener interface {
+	net.Listener
+
+	mustEmbedUnimplementedListener()
 }
 
-// NewListener listens on the network address and returns a Listener
-// configured with the given Config.
+type newListenerFunc func(*Config) (Listener, error)
+
+var (
+	knownListenerVersions = make(map[string]newListenerFunc)
+
+	ErrListenerAlreadyRegistered = errors.New("water: listener already registered")
+	ErrListenerVersionNotFound   = errors.New("water: listener version not found")
+	ErrUnimplementedListener     = errors.New("water: unimplemented Listener")
+)
+
+// UnimplementedListener is a Listener that always returns errors.
 //
-// This is the recommended way to create a Listener, unless there are
-// other requirements such as supplying a custom net.Listener. In that
-// case, a Listener could be created with WrapListener() with a Config
-// specifying a custom net.Listener.
-func NewListener(c *config.Config, network, address string) (net.Listener, error) {
-	lis, err := net.Listen(network, address)
-	if err != nil {
-		return nil, err
-	}
+// It is used to ensure forward compatibility of the Listener interface.
+type UnimplementedListener struct{}
 
-	config := c.Clone()
-	config.NetworkListener = lis
-
-	return &Listener{
-		Config: config,
-		closed: new(atomic.Bool),
-	}, nil
+// Accept implements Listener.Accept().
+func (*UnimplementedListener) Accept() (net.Conn, error) {
+	return nil, ErrUnimplementedListener
 }
 
-// WrapListener creates a Listener with the given Config.
-//
-// The Config must specify a custom net.Listener, otherwise the
-// Accept() method will fail.
-func WrapListener(config *config.Config) *Listener {
-	return &Listener{
-		Config: config,
-		closed: new(atomic.Bool),
-	}
+// Close implements Listener.Close().
+func (*UnimplementedListener) Close() error {
+	return ErrUnimplementedListener
 }
 
-// Accept waits for and returns the next connection after processing
-// the data with the WASM module.
-//
-// The returned net.Conn implements net.Conn and could be seen as
-// the inbound connection with a wrapping transport protocol handled
-// by the WASM module.
-//
-// Implements net.Listener.
-func (l *Listener) Accept() (net.Conn, error) {
-	if l.closed.Load() {
-		return nil, fmt.Errorf("water: listener is closed")
-	}
-
-	if l.Config == nil {
-		return nil, fmt.Errorf("water: dialing with nil config is not allowed")
-	}
-
-	var core runtime.Core
-	var err error
-	core, err = NewCore(l.Config)
-	if err != nil {
-		return nil, err
-	}
-
-	return AcceptVersion(core)
-}
-
-// Close closes the listener.
-//
-// Implements net.Listener.
-func (l *Listener) Close() error {
-	if l.closed.CompareAndSwap(false, true) {
-		return l.Config.NetworkListener.Close()
-	}
+// Addr implements Listener.Addr().
+func (*UnimplementedListener) Addr() net.Addr {
 	return nil
 }
 
-// Addr returns the listener's network address.
+// mustEmbedUnimplementedListener is a function that developers cannot
+func (*UnimplementedListener) mustEmbedUnimplementedListener() {}
+
+// RegisterListener registers a Listener function for the given version to
+// the global registry. Only registered versions can be recognized and
+// used by NewListener().
+func RegisterListener(version string, listener newListenerFunc) error {
+	if _, ok := knownListenerVersions[version]; ok {
+		return ErrListenerAlreadyRegistered
+	}
+	knownListenerVersions[version] = listener
+	return nil
+}
+
+// NewListener creates a new Listener from the config.
 //
-// Implements net.Listener.
-func (l *Listener) Addr() net.Addr {
-	return l.Config.NetworkListener.Addr()
+// It automatically detects the version of the WebAssembly Transport
+// Module specified in the config.
+func NewListener(c *Config) (Listener, error) {
+	core, err := NewCore(c)
+	if err != nil {
+		return nil, err
+	}
+
+	// Search through all exported names and match them to potential
+	// Listener versions.
+	//
+	// TODO: detect the version of the WebAssembly Transport Module
+	// in a more organized way.
+	for _, export := range core.Module().Exports() {
+		if f, ok := knownListenerVersions[export.Name()]; ok {
+			return f(c)
+		}
+	}
+
+	return nil, ErrListenerVersionNotFound
 }

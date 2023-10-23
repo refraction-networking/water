@@ -1,4 +1,4 @@
-//go:build unix && !windows && !nov0
+// a //go:build unix && !windows && !exclude_v0
 
 package v0_test
 
@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/gaukas/water"
-	waterconfig "github.com/gaukas/water/config"
 	_ "github.com/gaukas/water/transport/v0"
 )
 
@@ -24,13 +23,13 @@ var (
 func BenchmarkConnV0(b *testing.B) {
 	// read file into plain_v0
 	var err error
-	plain_v0, err = os.ReadFile("../../testdata/plain.wasm")
+	plain_v0, err = os.ReadFile("../../testdata/plain_v0.wasm")
 	if err != nil {
 		b.Fatal(err)
 	}
 	b.Run("PlainV0-Dialer", benchmarkPlainV0Dialer)
-	// b.Run("PlainV0-Listener", benchmarkPlainV0Listener)
-	// b.Run("RefTCP", benchmarkReferenceTCP)
+	b.Run("PlainV0-Listener", benchmarkPlainV0Listener)
+	b.Run("RefTCP", benchmarkReferenceTCP)
 }
 
 func benchmarkPlainV0Dialer(b *testing.B) {
@@ -54,12 +53,14 @@ func benchmarkPlainV0Dialer(b *testing.B) {
 	}()
 
 	// Dial
-	dialer := &water.Dialer{
-		Config: &waterconfig.Config{
-			TMBin: plain_v0,
-		},
+	config := &water.Config{
+		TMBin: plain_v0,
 	}
-	dialer.Config.WASIConfig().InheritStdout()
+	// config.WASIConfig().InheritStdout()
+	dialer, err := water.NewDialer(config)
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	rConn, err := dialer.Dial("tcp", tcpLis.Addr().String())
 	if err != nil {
@@ -108,11 +109,11 @@ func benchmarkPlainV0Dialer(b *testing.B) {
 
 func benchmarkPlainV0Listener(b *testing.B) {
 	// prepare for listener
-	config := &waterconfig.Config{
+	config := &water.Config{
 		TMBin: plain_v0,
 	}
 
-	lis, err := water.NewListener(config, "tcp", "localhost:0")
+	lis, err := config.Listen("tcp", "localhost:0")
 	if err != nil {
 		b.Fatal(err)
 	}

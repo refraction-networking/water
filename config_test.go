@@ -1,18 +1,20 @@
-package config
+package water_test
 
 import (
 	"crypto/rand"
 	"net"
 	"reflect"
 	"testing"
+
+	"github.com/gaukas/water"
 )
 
 func TestConfigClone(t *testing.T) {
-	c := &Config{
-		TMBin:           make([]byte, 256),
-		DialerFunc:      nil, // functions aren't deeply equal unless nil
-		NetworkListener: &net.TCPListener{},
-		TMConfig: TMConfig{
+	c := &water.Config{
+		TMBin:             make([]byte, 256),
+		NetworkDialerFunc: nil, // functions aren't deeply equal unless nil
+		NetworkListener:   &net.TCPListener{},
+		TMConfig: water.TMConfig{
 			FilePath: "/tmp/watm.toml",
 		},
 	}
