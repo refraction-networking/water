@@ -36,3 +36,6 @@ Cargo.lock
 
 # Go workspace file
 go.work
+
+# Benchmark file
+bench.txt
