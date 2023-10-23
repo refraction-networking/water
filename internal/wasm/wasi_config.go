@@ -118,7 +118,6 @@ func (wcf *WASIConfigFactory) InheritStderr() {
 
 func (wcf *WASIConfigFactory) SetPreopenDir(path string, guestPath string) {
 	wcf.setupFuncs = append(wcf.setupFuncs, func(wasiConfig *wasmtime.WasiConfig) error {
-		wasiConfig.PreopenDir(path, guestPath)
-		return nil
+		return wasiConfig.PreopenDir(path, guestPath)
 	})
 }

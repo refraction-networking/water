@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	hexencoder_v0 []byte
-	plain_v0      []byte
+	// hexencoder_v0 []byte
+	plain_v0 []byte
 )
 
 func BenchmarkConnV0(b *testing.B) {
@@ -77,7 +77,10 @@ func benchmarkPlainV0Dialer(b *testing.B) {
 	}
 
 	var sendMsg []byte = make([]byte, 1024)
-	rand.Read(sendMsg)
+	_, err = rand.Read(sendMsg)
+	if err != nil {
+		b.Fatalf("rand.Read error: %s", err)
+	}
 
 	// b.Logf("sendMsg: %s", sendMsg)
 
@@ -141,7 +144,10 @@ func benchmarkPlainV0Listener(b *testing.B) {
 	}
 
 	var sendMsg []byte = make([]byte, 512)
-	rand.Read(sendMsg)
+	_, err = rand.Read(sendMsg)
+	if err != nil {
+		b.Fatalf("rand.Read error: %s", err)
+	}
 
 	b.SetBytes(1024) // we will send 512-byte data and 128-byte will be transmitted on wire due to hex encoding
 	b.ResetTimer()
@@ -199,7 +205,10 @@ func benchmarkReferenceTCP(b *testing.B) {
 	}
 
 	var sendMsg []byte = make([]byte, 1024)
-	rand.Read(sendMsg)
+	_, err = rand.Read(sendMsg)
+	if err != nil {
+		b.Fatalf("rand.Read error: %s", err)
+	}
 
 	b.SetBytes(1024)
 	b.ResetTimer()

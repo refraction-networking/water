@@ -215,10 +215,10 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 //
 // It will close both the network connection AND the WASM module, then
 // the user-facing net.Conn will be closed.
-func (c *Conn) Close() error {
-	var err error
+func (c *Conn) Close() (err error) {
 	if !c.closed.CompareAndSwap(false, true) {
 		err = errors.New("water: already closed")
+		return err
 	}
 
 	c.closeOnce.Do(func() {
@@ -227,7 +227,7 @@ func (c *Conn) Close() error {
 		log.Debugf("Cleaning TM")
 		c.tm.Cleanup()
 		log.Debugf("Canceling TM")
-		c.tm.Cancel()
+		err = c.tm.Cancel()
 		log.Debugf("TM canceled")
 	})
 
@@ -263,7 +263,7 @@ func (c *Conn) RemoteAddr() net.Addr {
 // SetDeadline implements the net.Conn interface.
 //
 // It calls to the underlying user-oriented connection's SetDeadline() method.
-func (c *Conn) SetDeadline(t time.Time) error {
+func (c *Conn) SetDeadline(t time.Time) (err error) {
 	// SetDeadline is only available to Dialer/Listener. But not Relay.
 	if c.callerConn == nil {
 		return errors.New("water: cannot set deadline, (*RuntimeConn).callerConn is nil")
@@ -273,11 +273,17 @@ func (c *Conn) SetDeadline(t time.Time) error {
 	// which is not necessarily the networkConn. (there would be middleware conns)
 
 	if c.dstConn != nil {
-		c.dstConn.SetDeadline(t)
+		err = c.dstConn.SetDeadline(t)
+		if err != nil {
+			return err
+		}
 	}
 
 	if c.srcConn != nil {
-		c.srcConn.SetDeadline(t)
+		err = c.srcConn.SetDeadline(t)
+		if err != nil {
+			return err
+		}
 	}
 
 	return c.callerConn.SetDeadline(t)

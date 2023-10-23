@@ -32,31 +32,39 @@ func UnixConnWrap(obj any) (*net.UnixConn, error) {
 		return nil, err
 	}
 
+	wg := new(sync.WaitGroup)
+
 	// if the object implements io.Reader: read from the object and write to the reverseUnixConn
 	if reader, ok := obj.(io.Reader); ok {
+		wg.Add(1)
 		go func() {
-			io.Copy(reverseUnixConn, reader)
+			_, _ = io.Copy(reverseUnixConn, reader)
+
 			// when the src is closed, we will close the dst
 			time.Sleep(1 * time.Millisecond)
 			log.Debugf("closing reverseUnixConn and unixConn")
-			reverseUnixConn.Close()
-			unixConn.Close()
+			err = reverseUnixConn.Close()
+			err = unixConn.Close()
+			wg.Done()
 		}()
 	}
 
 	// if the object implements io.Writer: read from the reverseUnixConn and write to the object
 	if writer, ok := obj.(io.Writer); ok {
+		wg.Add(1)
 		go func() {
-			io.Copy(writer, reverseUnixConn)
+			_, _ = io.Copy(writer, reverseUnixConn)
 			// when the src is closed, we will close the dst
 			if closer, ok := obj.(io.Closer); ok {
 				time.Sleep(1 * time.Millisecond)
 				log.Debugf("closing obj")
-				closer.Close()
+				_ = closer.Close()
 			}
+			wg.Done()
 		}()
 	}
 
+	wg.Wait()
 	return unixConn, nil
 }
 
@@ -72,32 +80,39 @@ func UnixConnFileWrap(obj any) (*os.File, error) {
 		return nil, err
 	}
 
+	wg := new(sync.WaitGroup)
+
 	// if the object implements io.Reader: read from the object and write to the reverseUnixConn
 	if reader, ok := obj.(io.Reader); ok {
+		wg.Add(1)
 		go func() {
-			io.Copy(reverseUnixConn, reader)
+			_, _ = io.Copy(reverseUnixConn, reader)
 			// when the src is closed, we will close the dst
 			time.Sleep(1 * time.Millisecond)
 			log.Debugf("closing reverseUnixConn and unixConn")
 			reverseUnixConn.Close()
-			unixConn.Close()
-			unixConnFile.Close()
+			_ = unixConn.Close()
+			_ = unixConnFile.Close()
+			wg.Done()
 		}()
 	}
 
 	// if the object implements io.Writer: read from the reverseUnixConn and write to the object
 	if writer, ok := obj.(io.Writer); ok {
+		wg.Add(1)
 		go func() {
-			io.Copy(writer, reverseUnixConn)
+			_, _ = io.Copy(writer, reverseUnixConn)
 			// when the src is closed, we will close the dst
 			if closer, ok := obj.(io.Closer); ok {
 				time.Sleep(1 * time.Millisecond)
 				log.Debugf("closing obj")
-				closer.Close()
+				_ = closer.Close()
 			}
+			wg.Done()
 		}()
 	}
 
+	wg.Wait()
 	return unixConnFile, nil
 }
 

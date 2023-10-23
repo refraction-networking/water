@@ -10,7 +10,10 @@ import (
 )
 
 func init() {
-	water.RegisterDialer("_water_v0", NewDialer)
+	err := water.RegisterDialer("_water_v0", NewDialer)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Dialer implements water.Dialer utilizing Water WATM API v0.

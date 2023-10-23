@@ -19,7 +19,10 @@ func TestConfigClone(t *testing.T) {
 		},
 	}
 
-	rand.Read(c.TMBin)
+	_, err := rand.Read(c.TMBin)
+	if err != nil {
+		t.Fatalf("rand.Read error: %v", err)
+	}
 
 	ccloned := c.Clone()
 

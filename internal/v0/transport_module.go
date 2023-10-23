@@ -119,7 +119,7 @@ func Core2TransportModule(core water.Core) *TransportModule {
 	// and all opened file descriptors (if any) associated with it
 	// when the TransportModule is garbage collected.
 	runtime.SetFinalizer(wasm, func(tm *TransportModule) {
-		tm.Cancel()
+		_ = tm.Cancel() // tm cannot be nil here as we just set it above
 		tm.DeferAll()
 		tm.Cleanup()
 	})

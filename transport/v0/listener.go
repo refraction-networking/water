@@ -11,7 +11,10 @@ import (
 )
 
 func init() {
-	water.RegisterListener("_water_v0", NewListener)
+	err := water.RegisterListener("_water_v0", NewListener)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Listener implements water.Listener utilizing Water WATM API v0.

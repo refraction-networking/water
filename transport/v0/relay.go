@@ -11,7 +11,10 @@ import (
 )
 
 func init() {
-	water.RegisterRelay("_water_v0", NewRelay)
+	err := water.RegisterRelay("_water_v0", NewRelay)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Relay implements water.Relay utilizing Water WATM API v0.
