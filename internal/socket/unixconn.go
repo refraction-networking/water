@@ -105,7 +105,7 @@ func UnixConnPair(path ...string) (*net.UnixConn, *net.UnixConn, error) {
 	var c1, c2 net.Conn
 
 	unixPath := ""
-	if len(path) == 0 {
+	if len(path) == 0 || path[0] == "" {
 		// randomize a socket name
 		randBytes := make([]byte, 16)
 		if _, err := rand.Read(randBytes); err != nil {

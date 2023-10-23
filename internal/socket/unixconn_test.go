@@ -12,7 +12,7 @@ import (
 )
 
 func TestUnixConnPair(t *testing.T) {
-	c1, c2, err := socket.UnixConnPair("")
+	c1, c2, err := socket.UnixConnPair()
 	if err != nil {
 		if c1 == nil || c2 == nil {
 			t.Fatal(err)

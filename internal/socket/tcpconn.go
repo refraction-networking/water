@@ -8,7 +8,7 @@ import (
 
 func TCPConnPair(address ...string) (c1, c2 net.Conn, err error) {
 	var tcpAddr string = ":0"
-	if len(address) > 0 {
+	if len(address) > 0 && address[0] != "" {
 		tcpAddr = address[0]
 	}
 
