@@ -4,9 +4,9 @@ import (
 	"net"
 )
 
-// managedDialer restricts the network and address to be
+// ManagedDialer restricts the network and address to be
 // used by the dialerFunc.
-type managedDialer struct {
+type ManagedDialer struct {
 	network    string
 	address    string
 	dialerFunc func(network, address string) (net.Conn, error)
@@ -14,8 +14,8 @@ type managedDialer struct {
 	// mapFdClonedFile map[int32]*os.File // saves all files so GC won't close them
 }
 
-func ManagedDialer(network, address string, dialerFunc func(network, address string) (net.Conn, error)) *managedDialer {
-	return &managedDialer{
+func NewManagedDialer(network, address string, dialerFunc func(network, address string) (net.Conn, error)) *ManagedDialer {
+	return &ManagedDialer{
 		network:    network,
 		address:    address,
 		dialerFunc: dialerFunc,
@@ -23,6 +23,6 @@ func ManagedDialer(network, address string, dialerFunc func(network, address str
 }
 
 // dial(apw i32) -> fd i32
-func (md *managedDialer) Dial() (net.Conn, error) {
+func (md *ManagedDialer) Dial() (net.Conn, error) {
 	return md.dialerFunc(md.network, md.address)
 }

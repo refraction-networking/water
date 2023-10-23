@@ -36,11 +36,11 @@ func WrapConnectFunc(f WASIConnectFunc) wasm.WASMTIMEStoreIndependentFunction {
 
 // UnimplementedWASIConnectFunc wraps unimplementedWASIConnectFunc into a
 // wasmtime-compliant function.
-func UnimplementedWASIConnectFunc() wasm.WASMTIMEStoreIndependentFunction {
+func WrappedUnimplementedWASIConnectFunc() wasm.WASMTIMEStoreIndependentFunction {
 	return WrapConnectFunc(unimplementedWASIConnectFunc)
 }
 
 // unimplementedWASIConnectFunc is a WASIConnectFunc that does nothing.
-func unimplementedWASIConnectFunc(caller *wasmtime.Caller) (fd int32, err error) {
+func unimplementedWASIConnectFunc(_ *wasmtime.Caller) (fd int32, err error) {
 	return wasm.INVALID_FUNCTION, fmt.Errorf("NOP WASIConnectFunc is called")
 }

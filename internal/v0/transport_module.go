@@ -127,7 +127,7 @@ func Core2TransportModule(core water.Core) *TransportModule {
 	return wasm
 }
 
-func (tm *TransportModule) LinkNetworkInterface(dialer *managedDialer, listener net.Listener) error {
+func (tm *TransportModule) LinkNetworkInterface(dialer *ManagedDialer, listener net.Listener) error {
 	if tm.core.Linker() == nil {
 		return fmt.Errorf("water: linker not set, is Core initialized?")
 	}
@@ -152,7 +152,7 @@ func (tm *TransportModule) LinkNetworkInterface(dialer *managedDialer, listener 
 	} else {
 		if err := tm.core.Linker().FuncNew(
 			"env", "host_dial", WASIConnectFuncType,
-			UnimplementedWASIConnectFunc(),
+			WrappedUnimplementedWASIConnectFunc(),
 		); err != nil {
 			return fmt.Errorf("water: linking NOP dialer, (*wasmtime.Linker).FuncNew: %w", err)
 		}
@@ -178,7 +178,7 @@ func (tm *TransportModule) LinkNetworkInterface(dialer *managedDialer, listener 
 	} else {
 		if err := tm.core.Linker().FuncNew(
 			"env", "host_accept", WASIConnectFuncType,
-			UnimplementedWASIConnectFunc(),
+			WrappedUnimplementedWASIConnectFunc(),
 		); err != nil {
 			return fmt.Errorf("water: linking NOP listener, (*wasmtime.Linker).FuncNew: %w", err)
 		}

@@ -48,7 +48,7 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 		closeOnce: &sync.Once{},
 	}
 
-	dialer := v0.ManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
+	dialer := v0.NewManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
 
 	if err = conn.tm.LinkNetworkInterface(dialer, nil); err != nil {
 		return nil, err
@@ -149,7 +149,7 @@ func relay(core water.Core, network, address string) (c water.Conn, err error) {
 		closeOnce: &sync.Once{},
 	}
 
-	dialer := v0.ManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
+	dialer := v0.NewManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
 
 	if err = conn.tm.LinkNetworkInterface(dialer, core.Config().NetworkListenerOrPanic()); err != nil {
 		return nil, err

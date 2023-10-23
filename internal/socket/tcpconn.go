@@ -12,7 +12,7 @@ func TCPConnPair(address ...string) (c1, c2 net.Conn, err error) {
 		tcpAddr = address[0]
 	}
 
-	l, err := net.Listen("tcp", tcpAddr)
+	l, err := net.Listen("tcp", tcpAddr) // skipcq: GSC-G102
 	if err != nil {
 		return nil, nil, fmt.Errorf("net.Listen returned error: %w", err)
 	}
