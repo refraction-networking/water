@@ -1,13 +1,18 @@
-# W.A.T.E.R.: WebAssembly Transport Executable Reactor
-[![License](https://img.shields.io/badge/License-Apache_2.0-yellowgreen.svg)](https://opensource.org/licenses/Apache-2.0) [![Build Status](https://github.com/gaukas/water/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/gaukas/water/actions/workflows/go.yml) 
+# W.A.T.E.R.: WebAssembly Transport Executables Runtime
+[![License](https://img.shields.io/badge/License-Apache_2.0-yellowgreen.svg)](https://opensource.org/licenses/Apache-2.0) 
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgaukas%2Fwater.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgaukas%2Fwater?ref=badge_shield&issueType=license)
+[![Build Status](https://github.com/gaukas/water/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/gaukas/water/actions/workflows/go.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/gaukas/water.svg)](https://pkg.go.dev/github.com/gaukas/water)
+[![DeepSource](https://app.deepsource.com/gh/gaukas/water.svg/?label=resolved+issues&show_trend=true&token=SonUOOtyjJHnPuIdEBGZp4zx)](https://app.deepsource.com/gh/gaukas/water/)
 
-W.A.T.E.R. provides a runtime environment for WebAssembly modules to run in and work as a application-layer transport protocol. It is designed to be highly portable and lightweight, and can be used as a replacement for pluggable transports.
+W.A.T.E.R. provides a runtime environment to run WebAssembly Transport Modules(WATM) as a pluggable application-layer transport protocol provider. It is designed to be highly portable and lightweight, which serves as an alternative approach for pluggable transports.
+
+# Usage
 
 ## API 
+Based on **WASI Preview 1 (wasip1)** snapshot, currently W.A.T.E.R. provides a set of provide a `net`-like APIs, including `Dialer`, `Listener` and `Relay`.
 
-Currently, W.A.T.E.R. provides a set of APIs based on **WASI Preview 1 (wasip1)** snapshot. 
-
-### Dialer 
+### Dialer
 
 A `Dialer` could be used to dial a remote address upon `Dial()` and return a `net.Conn` back to the caller once the connection is established. Caller could use the `net.Conn` to read and write data to the remote address and the data will be processed by a WebAssembly instance.
 
@@ -25,6 +30,6 @@ A `Relay` somewhat combines the role of `Dialer` and `Listener`. It could be use
 
 `Relay` is used to _upgrade_ the incoming connection into an outbound, transport-wrapped connection.
 
-## Usage
+## Example
 
 See [examples](./examples) for example usecase of W.A.T.E.R. API, including `Dialer`, `Listener` and `Relay`.
