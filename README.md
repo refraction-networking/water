@@ -5,30 +5,105 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/gaukas/water.svg)](https://pkg.go.dev/github.com/gaukas/water)
 [![DeepSource](https://app.deepsource.com/gh/gaukas/water.svg/?label=resolved+issues&show_trend=true&token=SonUOOtyjJHnPuIdEBGZp4zx)](https://app.deepsource.com/gh/gaukas/water/)
 
-W.A.T.E.R. provides a runtime environment to run WebAssembly Transport Modules(WATM) as a pluggable application-layer transport protocol provider. It is designed to be highly portable and lightweight, which serves as an alternative approach for pluggable transports.
+<div style="width: 100%; height = 160px">
+    <div style="width: 75%; height: 150px; float: left;"> 
+        WATER-go provides a golang runtime for WebAssembly Transport Modules(WATM) as a pluggable
+        application-layer transport protocol provider. It is designed to be highly portable and
+        lightweight, allowing for rapidly deployable pluggable transports. While other pluggable
+        transport implementations require a fresh client deployment (and app-store review) to update
+        their protocol WATER allows <b><u>dynamic delivery of new transports</u></b> in real time
+        over the network.<br />
+        <br />
+    </div>
+    <div style="margin-left: 80%; height: 150px;"> 
+        <img src=".github/assets/logo_v0.svg" alt="WATER wasm transport" align="right">
+    </div>
+</div>
+
+Information about writing, buiding, and sharing WebAssembly Transport Modules can be found in the
+[water-rs](https://github.com/erikziyunchi/water-rs/tree/main/crates/wasm) library. 
 
 # Usage
 
-## API 
-Based on **WASI Preview 1 (wasip1)** snapshot, currently W.A.T.E.R. provides a set of provide a `net`-like APIs, including `Dialer`, `Listener` and `Relay`.
+<!-- ## API  -->
+Based on **WASI Preview 1 (wasip1)** snapshot, currently W.A.T.E.R. provides a set of
+`net`-like APIs, including `Dialer`, `Listener` and `Relay`.
 
 ### Dialer
 
-A `Dialer` could be used to dial a remote address upon `Dial()` and return a `net.Conn` back to the caller once the connection is established. Caller could use the `net.Conn` to read and write data to the remote address and the data will be processed by a WebAssembly instance.
+A `Dialer` connects to a remote address and returns a `net.Conn` to the caller if the connection can
+be successfully established. The `net.Conn` then provides tunnelled read and write to the remote
+endpoint with the WebAssembly module wrapping / encrypting / transforming the traffic.
 
-`Dialer` is used to _upgrade_ (encode, wrap) the caller's connection into an outbound, transport-wrapped connection.
+`Dialer` is used to encapsulate the caller's connection into an outbound, transport-wrapped
+connection.
+
+```go
+    wasm, err := os.ReadFile("./examples/v0plus/plain/plain.wasm")
+
+	config := &water.Config{
+		TMBin:             wasm,
+	}
+
+	dialer, err := water.NewDialer(config)
+	conn, err := dialer.Dial("tcp", remoteAddr)
+    // ...
+```
 
 ### Listener
 
-A `Listener` could be used to listen on a local address. Upon `Accept()`, it returns a `net.Conn` back once an incoming connection is accepted from the wrapped listener. Caller could use the `net.Conn` to read and write data to the remote address and the data will be processed by a WebAssembly instance.
+A `Listener` listens on a local address for incoming connections which  it `Accept()`s, returning
+a `net.Conn` for the caller to handle. The WebAssembly Module is responsible for the initial
+accpt allowing it to implement both the server side handshake as well as any unwrap / decrypt
+/reform operations required to validate and re-assemble the stream. The `net.Conn` returned provides
+the normalized stream, and allows the caller to write back to the client with the WebAssembly module
+encoding / encrypting / transforming traffic to be obfuscated on the wire on the way to the remote 
+client.
 
-`Listener` is used to _downgrade_ (decode, unwrap) the incoming transport-wrapped connection into caller's raw connection.
+
+`Listener` is used to decapsulate incoming transport-wrapped connections for the caller to handle,
+managing the tunnel obfuscation once a connection is established.
+
+```go
+    wasm, err := os.ReadFile("./examples/v0plus/plain/plain.wasm")
+
+	config := &water.Config{
+		TMBin: wasm,
+	}
+
+	lis, err := config.Listen("tcp", localAddr)
+	defer lis.Close()
+	log.Infof("Listening on %s", lis.Addr().String())
+
+	clientCntr := 0
+	for {
+		conn, err := lis.Accept()
+        // ...
+    }
+```
 
 ### Relay
 
-A `Relay` somewhat combines the role of `Dialer` and `Listener`. It could be used to listen on a local address and dial a remote address and automatically `Accept()` the incoming connections, feed them into the WebAssembly Transport Module and `Dial()` a pre-defined remote address. Without any caller interaction, the `Relay` will automatically handle the data transmission between the two ends.
+A `Relay` combines the role of `Dialer` and `Listener`. It listens on a local address `Accept()`-ing
+incoming connections and `Dial()`-ing the remote endpoints on establishment. The connecions are
+tunneled through the WebAssembly Transport Module allowing the module to handshake, encode,
+transform, pad, etc. without any caller interaction. The internal `Relay` manages  the incoming
+connections as well as the associated outgoing connectons.
 
-`Relay` is used to _upgrade_ the incoming connection into an outbound, transport-wrapped connection.
+`Relay` is a managed many-to-many handler for incoming connections that uses the WebAssemble module
+to tunnel traffic.
+
+```go
+    wasm, err := os.ReadFile("./examples/v0plus/plain/plain.wasm")
+
+	config := &water.Config{
+		TMBin:             wasm,
+	}
+
+	relay, err := water.NewRelay(config)
+
+	err = relay.ListenAndRelayTo("tcp", localAddr, "tcp", remoteAddr)
+```
 
 ## Example
 
