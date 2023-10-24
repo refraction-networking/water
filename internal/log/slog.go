@@ -21,7 +21,7 @@ func Infof(format string, args ...any) {
 	slogger.Info(fmt.Sprintf(format, args...))
 }
 
-func Warningf(format string, args ...any) {
+func Warnf(format string, args ...any) {
 	slogger.Warn(fmt.Sprintf(format, args...))
 }
 

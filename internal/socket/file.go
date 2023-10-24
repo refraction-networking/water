@@ -9,12 +9,15 @@ import (
 	"github.com/gaukas/water/internal/log"
 )
 
+// ErrNoKnownConversion is returned when the given object cannot be converted to *os.File
 var ErrNoKnownConversion = errors.New("no known conversion to *os.File")
 
+// EmbedFile is an interface for objects that can be converted to *os.File
 type EmbedFile interface {
 	File() (*os.File, error)
 }
 
+// AsFile converts the given object to *os.File
 func AsFile(f any) (*os.File, error) {
 	switch f := f.(type) {
 	case *os.File:

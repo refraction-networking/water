@@ -6,13 +6,8 @@ import (
 	"time"
 )
 
-var (
-	mapCoreDialContext = make(map[string]func(core *core, network, address string) (Conn, error))
-	mapCoreAccept      = make(map[string]func(*core) (Conn, error))
-)
-
-// Conn is an abstracted connection interface which encapsulates
-// a WASM runtime core.
+// Conn is an abstracted connection interface which is expected
+// to encapsulate a Core.
 type Conn interface {
 	net.Conn
 
@@ -21,22 +16,6 @@ type Conn interface {
 	// UnimplementedConn in order to make sure they could be used
 	// in the future without any code change.
 	mustEmbedUnimplementedConn()
-}
-
-func RegisterDial(version string, dialContext func(core *core, network, address string) (Conn, error)) error {
-	if _, ok := mapCoreDialContext[version]; ok {
-		return fmt.Errorf("water: core dial context already registered for version %s", version)
-	}
-	mapCoreDialContext[version] = dialContext
-	return nil
-}
-
-func RegisterAccept(version string, accept func(*core) (Conn, error)) error {
-	if _, ok := mapCoreAccept[version]; ok {
-		return fmt.Errorf("water: core accept already registered for version %s", version)
-	}
-	mapCoreAccept[version] = accept
-	return nil
 }
 
 // UnimplementedConn is used to provide forward compatibility for

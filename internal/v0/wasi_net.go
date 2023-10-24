@@ -7,8 +7,10 @@ import (
 	"github.com/gaukas/water/internal/wasm"
 )
 
+// WASIConnectFunc is a function that creates a connection.
 type WASIConnectFunc = func(caller *wasmtime.Caller) (fd int32, err error)
 
+// WASIConnectFuncType is the signature of WASIConnectFunc.
 var WASIConnectFuncType *wasmtime.FuncType = wasmtime.NewFuncType(
 	[]*wasmtime.ValType{},
 	[]*wasmtime.ValType{
@@ -16,6 +18,7 @@ var WASIConnectFuncType *wasmtime.FuncType = wasmtime.NewFuncType(
 	},
 )
 
+// WrapConnectFunc wraps a WASIConnectFunc into a WASM function.
 func WrapConnectFunc(f WASIConnectFunc) wasm.WASMTIMEStoreIndependentFunction {
 	return func(caller *wasmtime.Caller, vals []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
 		if len(vals) != 0 {
@@ -31,11 +34,13 @@ func WrapConnectFunc(f WASIConnectFunc) wasm.WASMTIMEStoreIndependentFunction {
 	}
 }
 
-func WrappedNopWASIConnectFunc() wasm.WASMTIMEStoreIndependentFunction {
-	return WrapConnectFunc(nopWASIConnectFunc)
+// UnimplementedWASIConnectFunc wraps unimplementedWASIConnectFunc into a
+// wasmtime-compliant function.
+func WrappedUnimplementedWASIConnectFunc() wasm.WASMTIMEStoreIndependentFunction {
+	return WrapConnectFunc(unimplementedWASIConnectFunc)
 }
 
-// nopWASIConnectFunc is a WASIConnectFunc that does nothing.
-func nopWASIConnectFunc(caller *wasmtime.Caller) (fd int32, err error) {
+// unimplementedWASIConnectFunc is a WASIConnectFunc that does nothing.
+func unimplementedWASIConnectFunc(_ *wasmtime.Caller) (fd int32, err error) {
 	return wasm.INVALID_FUNCTION, fmt.Errorf("NOP WASIConnectFunc is called")
 }

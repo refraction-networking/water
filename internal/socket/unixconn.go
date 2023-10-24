@@ -2,13 +2,14 @@ package socket
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/gaukas/water/internal/log"
 )
 
 // UnixConnWrap wraps an io.Reader/io.Writer/io.ReadWriteCloser
@@ -25,83 +26,109 @@ import (
 // Once this function is invoked, the caller should not perform I/O
 // operations on the ReadWriteCloser anymore.
 func UnixConnWrap(obj any) (*net.UnixConn, error) {
-	// randomize the name of the socket
-	var randName []byte = make([]byte, 8) // 8-byte so 16-char hex string, 64-bit randomness is good enough
-	if _, err := rand.Read(randName); err != nil {
+	// get a pair of connected UnixConn
+	unixConn, reverseUnixConn, err := UnixConnPair()
+	if err != nil && (unixConn == nil || reverseUnixConn == nil) {
 		return nil, err
 	}
-	socketName := hex.EncodeToString(randName)
 
-	// listen on the socket
-	unixAddr, err := net.ResolveUnixAddr("unix", os.TempDir()+"/"+string(socketName))
-	if err != nil {
-		return nil, err
-	}
-	unixListener, err := net.ListenUnix("unix", unixAddr)
-	if err != nil {
-		return nil, err
-	}
-	defer unixListener.Close() // we will no longer need this listener since the name is not recorded anywhere
-
-	// spin up a goroutine to wait for listening
-	var unixConn *net.UnixConn
-	var acceptErr error
-	acceptWg := &sync.WaitGroup{}
-	acceptWg.Add(1)
-	go func() {
-		defer acceptWg.Done()
-		unixConn, acceptErr = unixListener.AcceptUnix() // so caller will have the accepted connection
-		if acceptErr != nil {
-			return
-		}
-	}()
-
-	// reverseUnixConn is used to access the unixConn's read/write buffer:
-	// - writing to reverseUnixConn = save to unixConn's read buffer
-	// - reading from reverseUnixConn = read from unixConn's write buffer
-	reverseUnixConn, err := net.DialUnix("unix", nil, unixAddr)
-	if err != nil {
-		return nil, err
-	}
-	acceptWg.Wait() // wait for the goroutine to accept the connection
-	if acceptErr != nil {
-		return nil, acceptErr
-	}
+	wg := new(sync.WaitGroup)
 
 	// if the object implements io.Reader: read from the object and write to the reverseUnixConn
 	if reader, ok := obj.(io.Reader); ok {
+		wg.Add(1)
 		go func() {
-			io.Copy(reverseUnixConn, reader)
+			_, _ = io.Copy(reverseUnixConn, reader)
+
 			// when the src is closed, we will close the dst
 			time.Sleep(1 * time.Millisecond)
-			reverseUnixConn.Close()
+			log.Debugf("closing reverseUnixConn and unixConn")
+			err = reverseUnixConn.Close()
+			err = unixConn.Close()
+			wg.Done()
 		}()
 	}
 
 	// if the object implements io.Writer: read from the reverseUnixConn and write to the object
 	if writer, ok := obj.(io.Writer); ok {
+		wg.Add(1)
 		go func() {
-			io.Copy(writer, reverseUnixConn)
+			_, _ = io.Copy(writer, reverseUnixConn)
 			// when the src is closed, we will close the dst
 			if closer, ok := obj.(io.Closer); ok {
 				time.Sleep(1 * time.Millisecond)
-				closer.Close()
+				log.Debugf("closing obj")
+				_ = closer.Close()
 			}
+			wg.Done()
 		}()
 	}
 
+	wg.Wait()
 	return unixConn, nil
 }
 
-func UnixConnPair(path string) (c1, c2 net.Conn, err error) {
-	unixPath := path
-	if path == "" {
+func UnixConnFileWrap(obj any) (*os.File, error) {
+	// get a pair of connected UnixConn
+	unixConn, reverseUnixConn, err := UnixConnPair()
+	if err != nil && (unixConn == nil || reverseUnixConn == nil) {
+		return nil, err
+	}
+
+	unixConnFile, err := unixConn.File()
+	if err != nil {
+		return nil, err
+	}
+
+	wg := new(sync.WaitGroup)
+
+	// if the object implements io.Reader: read from the object and write to the reverseUnixConn
+	if reader, ok := obj.(io.Reader); ok {
+		wg.Add(1)
+		go func() {
+			_, _ = io.Copy(reverseUnixConn, reader)
+			// when the src is closed, we will close the dst
+			time.Sleep(1 * time.Millisecond)
+			log.Debugf("closing reverseUnixConn and unixConn")
+			reverseUnixConn.Close()
+			_ = unixConn.Close()
+			_ = unixConnFile.Close()
+			wg.Done()
+		}()
+	}
+
+	// if the object implements io.Writer: read from the reverseUnixConn and write to the object
+	if writer, ok := obj.(io.Writer); ok {
+		wg.Add(1)
+		go func() {
+			_, _ = io.Copy(writer, reverseUnixConn)
+			// when the src is closed, we will close the dst
+			if closer, ok := obj.(io.Closer); ok {
+				time.Sleep(1 * time.Millisecond)
+				log.Debugf("closing obj")
+				_ = closer.Close()
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	return unixConnFile, nil
+}
+
+func UnixConnPair(path ...string) (*net.UnixConn, *net.UnixConn, error) {
+	var c1, c2 net.Conn
+
+	unixPath := ""
+	if len(path) == 0 || path[0] == "" {
 		// randomize a socket name
 		randBytes := make([]byte, 16)
 		if _, err := rand.Read(randBytes); err != nil {
 			return nil, nil, fmt.Errorf("crypto/rand.Read returned error: %w", err)
 		}
 		unixPath = os.TempDir() + string(os.PathSeparator) + fmt.Sprintf("%x", randBytes)
+	} else {
+		unixPath = path[0]
 	}
 
 	// create a one-time use UnixListener
@@ -133,5 +160,14 @@ func UnixConnPair(path string) (c1, c2 net.Conn, err error) {
 		return nil, nil, fmt.Errorf("c1 or c2 is nil")
 	}
 
-	return c1, c2, ul.Close()
+	// type assertion
+	if uc1, ok := c1.(*net.UnixConn); ok {
+		if uc2, ok := c2.(*net.UnixConn); ok {
+			return uc1, uc2, ul.Close()
+		} else {
+			return nil, nil, fmt.Errorf("c2 is not *net.UnixConn")
+		}
+	} else {
+		return nil, nil, fmt.Errorf("c1 is not *net.UnixConn")
+	}
 }

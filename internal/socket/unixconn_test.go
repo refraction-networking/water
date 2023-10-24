@@ -12,7 +12,7 @@ import (
 )
 
 func TestUnixConnPair(t *testing.T) {
-	c1, c2, err := socket.UnixConnPair("")
+	c1, c2, err := socket.UnixConnPair()
 	if err != nil {
 		if c1 == nil || c2 == nil {
 			t.Fatal(err)
@@ -42,9 +42,11 @@ func TestUnixConnPair(t *testing.T) {
 
 func testIO(wrConn, rdConn net.Conn, N int, sz int, sleep time.Duration) error {
 	var sendMsg []byte = make([]byte, sz)
-	rand.Read(sendMsg)
+	_, err := rand.Read(sendMsg)
+	if err != nil {
+		return fmt.Errorf("rand.Read error: %w", err)
+	}
 
-	var err error
 	for i := 0; i < N; i++ {
 		_, err = wrConn.Write(sendMsg)
 		if err != nil {

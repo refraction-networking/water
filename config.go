@@ -2,45 +2,34 @@ package water
 
 import (
 	"net"
-	"os"
 
-	"github.com/gaukas/water/internal/log"
 	"github.com/gaukas/water/internal/wasm"
 )
 
+// Config defines the configuration for the WATER Dialer/Config interface.
 type Config struct {
-	// WATMBin contains the binary format of the WebAssembly Transport Module.
+	// TMBin contains the binary format of the WebAssembly Transport Module.
 	// In a typical use case, this mandatory field is populated by loading
 	// from a .wasm file, downloaded from a remote target, or generated from
 	// a .wat (WebAssembly Text Format) file.
-	WATMBin []byte
+	TMBin []byte
 
-	// DialerFunc specifies a func that dials the specified address on the
+	// NetworkDialerFunc specifies a func that dials the specified address on the
 	// named network. This optional field can be set to override the Go
 	// default dialer func:
 	// 	net.Dial(network, address)
-	DialerFunc func(network, address string) (net.Conn, error)
+	NetworkDialerFunc func(network, address string) (net.Conn, error)
 
 	// NetworkListener specifies a net.listener implementation that listens
 	// on the specified address on the named network. This optional field
 	// will be used to provide (incoming) network connections from a
 	// presumably remote source to the WASM instance. Required by
-	// ListenConfig().
+	// water.WrapListener().
 	NetworkListener net.Listener
 
-	// Feature specifies a series of experimental features for the WASM
-	// runtime.
-	//
-	// Each feature flag is bit-masked and version-dependent, and flags
-	// are independent of each other. This means that a particular
-	// feature flag may be supported in one version of the runtime but
-	// not in another. If a feature flag is not supported or not recognized
-	// by the runtime, it will be silently ignored.
-	Feature Feature
-
-	// WATMConfig optionally provides a configuration file to be pushed into
+	// TMConfig optionally provides a configuration file to be pushed into
 	// the WASM Transport Module.
-	WATMConfig WATMConfig
+	TMConfig TMConfig
 
 	// wasiConfigFactory is used to replicate the WASI config for each WASM
 	// instance created. This field is for advanced use cases and/or debugging
@@ -52,32 +41,36 @@ type Config struct {
 	wasiConfigFactory *wasm.WASIConfigFactory
 }
 
+// Clone creates a deep copy of the Config.
 func (c *Config) Clone() *Config {
 	if c == nil {
 		return nil
 	}
 
-	wasmClone := make([]byte, len(c.WATMBin))
-	copy(wasmClone, c.WATMBin)
+	wasmClone := make([]byte, len(c.TMBin))
+	copy(wasmClone, c.TMBin)
 
 	return &Config{
-		WATMBin:           c.WATMBin,
-		DialerFunc:        c.DialerFunc,
+		TMBin:             c.TMBin,
+		NetworkDialerFunc: c.NetworkDialerFunc,
 		NetworkListener:   c.NetworkListener,
-		Feature:           c.Feature,
-		WATMConfig:        c.WATMConfig,
+		TMConfig:          c.TMConfig,
 		wasiConfigFactory: c.wasiConfigFactory.Clone(),
 	}
 }
 
-func (c *Config) DialerFuncOrDefault() func(network, address string) (net.Conn, error) {
-	if c.DialerFunc == nil {
+// NetworkDialerFuncOrDefault returns the DialerFunc if it is not nil, otherwise
+// returns the default net.Dial function.
+func (c *Config) NetworkDialerFuncOrDefault() func(network, address string) (net.Conn, error) {
+	if c.NetworkDialerFunc == nil {
 		return net.Dial
 	}
 
-	return c.DialerFunc
+	return c.NetworkDialerFunc
 }
 
+// NetworkListenerOrDefault returns the NetworkListener if it is not nil,
+// otherwise it panics.
 func (c *Config) NetworkListenerOrPanic() net.Listener {
 	if c.NetworkListener == nil {
 		panic("water: network listener is not provided in config")
@@ -86,14 +79,17 @@ func (c *Config) NetworkListenerOrPanic() net.Listener {
 	return c.NetworkListener
 }
 
+// WATMBinOrDefault returns the WATMBin if it is not nil, otherwise it panics.
 func (c *Config) WATMBinOrPanic() []byte {
-	if len(c.WATMBin) == 0 {
+	if len(c.TMBin) == 0 {
 		panic("water: WebAssembly Transport Module binary is not provided in config")
 	}
 
-	return c.WATMBin
+	return c.TMBin
 }
 
+// WASIConfig returns the WASIConfigFactory. If the pointer is
+// nil, a new WASIConfigFactory will be created and returned.
 func (c *Config) WASIConfig() *wasm.WASIConfigFactory {
 	if c.wasiConfigFactory == nil {
 		c.wasiConfigFactory = wasm.NewWasiConfigFactory()
@@ -102,23 +98,14 @@ func (c *Config) WASIConfig() *wasm.WASIConfigFactory {
 	return c.wasiConfigFactory
 }
 
-// WATMConfig defines the configuration file used by the WebAssembly Transport Module.
-type WATMConfig struct {
-	FilePath string // Path to the config file.
-}
-
-// File opens the config file and returns the file descriptor.
-func (c *WATMConfig) File() *os.File {
-	if c.FilePath == "" {
-		log.Errorf("water: WASM config file path is not provided in config")
-		return nil
-	}
-
-	f, err := os.Open(c.FilePath)
+func (c *Config) Listen(network, address string) (net.Listener, error) {
+	lis, err := net.Listen(network, address)
 	if err != nil {
-		log.Errorf("water: failed to open WATM config file: %v", err)
-		return nil
+		return nil, err
 	}
 
-	return f
+	config := c.Clone()
+	config.NetworkListener = lis
+
+	return NewListener(config)
 }
