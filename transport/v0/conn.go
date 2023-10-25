@@ -224,10 +224,10 @@ func (c *Conn) Close() (err error) {
 	c.closeOnce.Do(func() {
 		log.Debugf("Defering TM")
 		c.tm.DeferAll()
-		log.Debugf("Cleaning TM")
-		c.tm.Cleanup()
 		log.Debugf("Canceling TM")
 		err = c.tm.Cancel()
+		log.Debugf("Cleaning TM")
+		c.tm.Cleanup()
 		log.Debugf("TM canceled")
 	})
 
