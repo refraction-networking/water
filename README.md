@@ -39,7 +39,7 @@ endpoint with the WebAssembly module wrapping / encrypting / transforming the tr
 connection.
 
 ```go
-    wasm, err := os.ReadFile("./examples/v0plus/plain/plain.wasm")
+    wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
 
 	config := &water.Config{
 		TMBin:             wasm,
@@ -65,7 +65,7 @@ client.
 managing the tunnel obfuscation once a connection is established.
 
 ```go
-    wasm, err := os.ReadFile("./examples/v0plus/plain/plain.wasm")
+    wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
 
 	config := &water.Config{
 		TMBin: wasm,
@@ -94,7 +94,7 @@ connections as well as the associated outgoing connectons.
 to tunnel traffic.
 
 ```go
-    wasm, err := os.ReadFile("./examples/v0plus/plain/plain.wasm")
+    wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
 
 	config := &water.Config{
 		TMBin:             wasm,

@@ -16,7 +16,7 @@ func main() {
 	var localAddr string = os.Args[1]
 	var remoteAddr string = os.Args[2]
 
-	wasm, err := os.ReadFile("./examples/v0plus/plain/plain.wasm")
+	wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
 	if err != nil {
 		panic(fmt.Sprintf("failed to read wasm file: %v", err))
 	}
