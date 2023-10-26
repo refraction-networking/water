@@ -1,6 +1,9 @@
 package water
 
-import "errors"
+import (
+	"errors"
+	"net"
+)
 
 // Relay listens on a local network address and handles requests
 // on incoming connections by passing the incoming connection to
@@ -31,6 +34,11 @@ type Relay interface {
 	// accepted and no further outbound connections will be dialed. It
 	// does not close the established connections.
 	Close() error
+
+	// Addr returns the local address the relay is listening on.
+	//
+	// If no address is available, instead of panicking it returns nil.
+	Addr() net.Addr
 
 	mustEmbedUnimplementedRelay()
 }
@@ -66,6 +74,11 @@ func (*UnimplementedRelay) ListenAndRelayTo(_, _, _, _ string) error {
 // Close implements Relay.Close().
 func (*UnimplementedRelay) Close() error {
 	return ErrUnimplementedRelay
+}
+
+// Addr implements Relay.Addr().
+func (*UnimplementedRelay) Addr() net.Addr {
+	return nil
 }
 
 // mustEmbedUnimplementedRelay is a function that developers cannot

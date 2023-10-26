@@ -20,8 +20,7 @@ func init() {
 // Relay implements water.Relay utilizing Water WATM API v0.
 type Relay struct {
 	config  *water.Config
-	started *atomic.Bool
-	closed  *atomic.Bool
+	running *atomic.Bool
 
 	dialNetwork, dialAddress string
 
@@ -33,14 +32,13 @@ type Relay struct {
 func NewRelay(c *water.Config) (water.Relay, error) {
 	return &Relay{
 		config:  c.Clone(),
-		started: new(atomic.Bool),
-		closed:  new(atomic.Bool),
+		running: new(atomic.Bool),
 	}, nil
 }
 
 // RelayTo implements Relay.RelayTo().
 func (r *Relay) RelayTo(network, address string) error {
-	if r.started.Load() {
+	if !r.running.CompareAndSwap(false, true) {
 		return water.ErrRelayAlreadyStarted
 	}
 
@@ -53,7 +51,7 @@ func (r *Relay) RelayTo(network, address string) error {
 
 	var core water.Core
 	var err error
-	for !r.closed.Load() {
+	for r.running.Load() {
 		core, err = water.NewCore(r.config)
 		if err != nil {
 			return err
@@ -61,7 +59,7 @@ func (r *Relay) RelayTo(network, address string) error {
 
 		_, err = relay(core, network, address)
 		if err != nil {
-			if !r.closed.Load() { // errored before closing
+			if r.running.Load() { // errored before closing
 				return err
 			}
 			break
@@ -73,7 +71,7 @@ func (r *Relay) RelayTo(network, address string) error {
 
 // ListenAndRelayTo implements Relay.ListenAndRelayTo().
 func (r *Relay) ListenAndRelayTo(lnetwork, laddress, rnetwork, raddress string) error {
-	if r.started.Load() {
+	if !r.running.CompareAndSwap(false, true) {
 		return water.ErrRelayAlreadyStarted
 	}
 
@@ -94,7 +92,7 @@ func (r *Relay) ListenAndRelayTo(lnetwork, laddress, rnetwork, raddress string) 
 	r.dialAddress = raddress
 
 	var core water.Core
-	for !r.closed.Load() {
+	for r.running.Load() {
 		core, err = water.NewCore(r.config)
 		if err != nil {
 			return err
@@ -102,7 +100,7 @@ func (r *Relay) ListenAndRelayTo(lnetwork, laddress, rnetwork, raddress string) 
 
 		_, err = relay(core, rnetwork, raddress)
 		if err != nil {
-			if !r.closed.Load() { // errored before closing
+			if r.running.Load() { // errored before closing
 				return err
 			}
 			break
@@ -113,7 +111,7 @@ func (r *Relay) ListenAndRelayTo(lnetwork, laddress, rnetwork, raddress string) 
 }
 
 func (r *Relay) Close() error {
-	if !r.closed.CompareAndSwap(false, true) {
+	if r.running.CompareAndSwap(true, false) {
 		return nil
 	}
 
@@ -122,4 +120,13 @@ func (r *Relay) Close() error {
 	}
 
 	return nil
+}
+
+// Addr implements Relay.Addr().
+func (r *Relay) Addr() net.Addr {
+	if r.config == nil {
+		return nil
+	}
+
+	return r.config.NetworkListener.Addr()
 }
