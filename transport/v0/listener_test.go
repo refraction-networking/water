@@ -20,7 +20,7 @@ func TestListener(t *testing.T) {
 	t.Run("partial WATM must fail", testListenerPartialWATM)
 }
 
-func testListenerBadAddr(t *testing.T) {
+func testListenerBadAddr(t *testing.T) { // skipcq: GO-R1005
 	// prepare
 	config := &water.Config{
 		TMBin: plain,

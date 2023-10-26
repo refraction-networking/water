@@ -17,7 +17,7 @@ func TestRelay(t *testing.T) {
 	t.Run("plain must work", testRelayPlain)
 }
 
-func testRelayPlain(t *testing.T) {
+func testRelayPlain(t *testing.T) { // skipcq: GO-R1005
 	// t.Skip()
 	// test destination: a local TCP server
 	tcpLis, err := net.ListenTCP("tcp", nil)

@@ -41,7 +41,7 @@ func testDialerBadAddr(t *testing.T) {
 	time.Sleep(100 * time.Microsecond)
 }
 
-func testDialerPlain(t *testing.T) {
+func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 	tcpLis, err := net.ListenTCP("tcp", nil)
 	if err != nil {
 		t.Fatal(err)
