@@ -39,7 +39,7 @@ func NewListener(c *water.Config) (water.Listener, error) {
 // by the WASM module.
 //
 // Implements net.Listener.
-func (l *Listener) Accept() (net.Conn, error) {
+func (l *Listener) Accept() (water.Conn, error) {
 	if l.closed.Load() {
 		return nil, fmt.Errorf("water: listener is closed")
 	}

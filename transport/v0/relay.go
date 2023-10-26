@@ -72,6 +72,7 @@ func (r *Relay) ListenAndRelayTo(lnetwork, laddress, rnetwork, raddress string) 
 	if !r.running.CompareAndSwap(false, true) {
 		return water.ErrRelayAlreadyStarted
 	}
+	defer r.running.CompareAndSwap(true, false)
 
 	lis, err := net.Listen(lnetwork, laddress)
 	if err != nil {
@@ -109,15 +110,15 @@ func (r *Relay) ListenAndRelayTo(lnetwork, laddress, rnetwork, raddress string) 
 }
 
 func (r *Relay) Close() error {
-	if r.running.CompareAndSwap(true, false) {
+	if !r.running.CompareAndSwap(true, false) {
 		return nil
 	}
 
 	if r.config != nil {
-		r.config.NetworkListener.Close()
+		return r.config.NetworkListener.Close()
 	}
 
-	return nil
+	return fmt.Errorf("water: relay is not configured")
 }
 
 // Addr implements Relay.Addr().

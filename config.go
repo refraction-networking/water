@@ -98,7 +98,7 @@ func (c *Config) WASIConfig() *wasm.WASIConfigFactory {
 	return c.wasiConfigFactory
 }
 
-func (c *Config) Listen(network, address string) (net.Listener, error) {
+func (c *Config) Listen(network, address string) (Listener, error) {
 	lis, err := net.Listen(network, address)
 	if err != nil {
 		return nil, err

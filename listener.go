@@ -22,10 +22,18 @@ import (
 //
 // As shown above, a Listener consists of a net.Listener to accept
 // incoming connections and a WATM to handle the incoming connections
-// from an external source. Accept() returns a net.Conn that caller
-// can Read()-from or Write()-to.
+// from an external source. Accept() returns a Conn that caller may
+// Read()-from or Write()-to.
 type Listener interface {
-	net.Listener
+	// Accept waits for and returns the next connection to the listener.
+	Accept() (Conn, error)
+
+	// Close closes the listener.
+	// Any blocked Accept operations will be unblocked and return errors.
+	Close() error
+
+	// Addr returns the listener's network address.
+	Addr() net.Addr
 
 	mustEmbedUnimplementedListener()
 }
@@ -48,7 +56,7 @@ var (
 type UnimplementedListener struct{}
 
 // Accept implements Listener.Accept().
-func (*UnimplementedListener) Accept() (net.Conn, error) {
+func (*UnimplementedListener) Accept() (Conn, error) {
 	return nil, ErrUnimplementedListener
 }
 
