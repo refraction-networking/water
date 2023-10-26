@@ -1,5 +1,3 @@
-//go:build !exclude_v0
-
 package v0
 
 import (
