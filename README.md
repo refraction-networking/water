@@ -39,7 +39,7 @@ endpoint with the WebAssembly module wrapping / encrypting / transforming the tr
 connection.
 
 ```go
-    wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
+	wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
 
 	config := &water.Config{
 		TMBin:             wasm,
@@ -47,7 +47,7 @@ connection.
 
 	dialer, err := water.NewDialer(config)
 	conn, err := dialer.Dial("tcp", remoteAddr)
-    // ...
+	// ...
 ```
 
 ### Listener
@@ -65,7 +65,7 @@ client.
 managing the tunnel obfuscation once a connection is established.
 
 ```go
-    wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
+	wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
 
 	config := &water.Config{
 		TMBin: wasm,
@@ -78,8 +78,8 @@ managing the tunnel obfuscation once a connection is established.
 	clientCntr := 0
 	for {
 		conn, err := lis.Accept()
-        // ...
-    }
+		// ...
+	}
 ```
 
 ### Relay
@@ -94,7 +94,7 @@ connections as well as the associated outgoing connectons.
 to tunnel traffic.
 
 ```go
-    wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
+	wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
 
 	config := &water.Config{
 		TMBin:             wasm,
@@ -102,7 +102,7 @@ to tunnel traffic.
 
 	relay, err := water.NewRelay(config)
 
-	err = relay.ListenAndRelayTo("tcp", localAddr, "tcp", remoteAddr)
+	err = relay.ListenAndRelayTo("tcp", localAddr, "tcp", remoteAddr) // blocking
 ```
 
 ## Example
