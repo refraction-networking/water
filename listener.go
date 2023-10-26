@@ -38,6 +38,8 @@ var (
 	ErrListenerAlreadyRegistered = errors.New("water: listener already registered")
 	ErrListenerVersionNotFound   = errors.New("water: listener version not found")
 	ErrUnimplementedListener     = errors.New("water: unimplemented Listener")
+
+	_ Listener = (*UnimplementedListener)(nil) // type guard
 )
 
 // UnimplementedListener is a Listener that always returns errors.

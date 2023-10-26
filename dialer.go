@@ -32,6 +32,8 @@ var (
 	ErrDialerAlreadyRegistered = errors.New("water: dialer already registered")
 	ErrDialerVersionNotFound   = errors.New("water: dialer version not found")
 	ErrUnimplementedDialer     = errors.New("water: unimplemented dialer")
+
+	_ Dialer = (*UnimplementedDialer)(nil) // type guard
 )
 
 // UnimplementedDialer is a Dialer that always returns errors.

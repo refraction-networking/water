@@ -43,8 +43,9 @@ var (
 	ErrRelayAlreadyRegistered = errors.New("water: relay already registered")
 	ErrRelayVersionNotFound   = errors.New("water: relay version not found")
 	ErrUnimplementedRelay     = errors.New("water: unimplemented relay")
+	ErrRelayAlreadyStarted    = errors.New("water: relay already started") // RelayTo and ListenAndRelayTo may return this error if a relay was reused.
 
-	ErrRelayAlreadyStarted = errors.New("water: relay already started") // RelayTo and ListenAndRelayTo may return this error if a relay was reused.
+	_ Relay = (*UnimplementedRelay)(nil) // type guard
 )
 
 // UnimplementedRelay is a Relay that always returns errors.
