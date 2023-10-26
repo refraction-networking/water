@@ -71,7 +71,7 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer conn.Close() // skipcq: GO-S2307
 
 	// type assertion: conn must be *v0.Conn
 	if _, ok := conn.(*v0.Conn); !ok {
@@ -82,7 +82,7 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 	if goroutineErr != nil {
 		t.Fatal(goroutineErr)
 	}
-	defer peerConn.Close()
+	defer peerConn.Close() // skipcq: GO-S2307
 
 	// trigger garbage collection for several times to simulate any
 	// possible GC in the real world use case
@@ -153,7 +153,11 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 	}
 
 	// reading with a deadline
-	conn.SetDeadline(time.Now().Add(100 * time.Millisecond))
+	err = conn.SetDeadline(time.Now().Add(100 * time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	_, err = conn.Read(waterRecvBuf)
 	if err == nil {
 		t.Fatalf("conn.Read must timeout")

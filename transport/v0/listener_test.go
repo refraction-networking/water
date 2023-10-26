@@ -63,14 +63,14 @@ func testListenerPlain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer peerConn.Close()
+	defer peerConn.Close() // skipcq: GO-S2307
 
 	// wait for listener to accept connection
 	wg.Wait()
 	if goroutineErr != nil {
 		t.Fatal(goroutineErr)
 	}
-	defer conn.Close()
+	defer conn.Close() // skipcq: GO-S2307
 
 	// type assertion: conn must be *v0.Conn
 	if _, ok := conn.(*v0.Conn); !ok {
@@ -146,7 +146,11 @@ func testListenerPlain(t *testing.T) {
 	}
 
 	// reading with a deadline
-	conn.SetDeadline(time.Now().Add(100 * time.Millisecond))
+	err = conn.SetDeadline(time.Now().Add(100 * time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	_, err = conn.Read(waterRecvBuf)
 	if err == nil {
 		t.Fatalf("conn.Read must timeout")
@@ -208,14 +212,14 @@ func BenchmarkListenerInbound(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer peerConn.Close()
+	defer peerConn.Close() // skipcq: GO-S2307
 
 	// wait for listener to accept connection
 	wg.Wait()
 	if goroutineErr != nil {
 		b.Fatal(goroutineErr)
 	}
-	defer conn.Close()
+	defer conn.Close() // skipcq: GO-S2307
 
 	var sendMsg []byte = make([]byte, 1024)
 	_, err = rand.Read(sendMsg)

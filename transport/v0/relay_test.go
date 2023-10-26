@@ -59,13 +59,14 @@ func testRelayPlain(t *testing.T) { // skipcq: GO-R1005
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer clientConn.Close()
+	defer clientConn.Close() // skipcq: GO-S2307
 
 	// wait for server to accept connection
 	serverAcceptWg.Wait()
 	if serverAcceptErr != nil {
 		t.Fatal(serverAcceptErr)
 	}
+	defer serverConn.Close() // skipcq: GO-S2307
 
 	// trigger garbage collection for several times to simulate any
 	// possible GC in the real world use case
