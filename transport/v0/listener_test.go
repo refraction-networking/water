@@ -46,7 +46,6 @@ func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer testLis.Close()
 
 	// goroutine to accept incoming connections
 	var conn net.Conn
@@ -181,6 +180,10 @@ func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 		t.Fatalf("conn.Read must fail after closing the conn")
 	}
 
+	if err = testLis.Close(); err != nil {
+		t.Fatal(err)
+	}
+
 	// trigger garbage collection
 	runtime.GC()
 	time.Sleep(100 * time.Microsecond)
@@ -205,7 +208,6 @@ func BenchmarkListenerInbound(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer testLis.Close()
 
 	// goroutine to accept incoming connections
 	var waterConn net.Conn
@@ -236,8 +238,11 @@ func BenchmarkListenerInbound(b *testing.B) {
 	}
 	benchmarkUnidirectionalStream(b, peerConn, waterConn)
 
-	err = waterConn.Close()
-	if err != nil {
+	if err = waterConn.Close(); err != nil {
+		b.Fatal(err)
+	}
+
+	if err = testLis.Close(); err != nil {
 		b.Fatal(err)
 	}
 }
@@ -253,7 +258,6 @@ func BenchmarkReverseListenerInbound(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer testLis.Close()
 
 	// goroutine to accept incoming connections
 	var waterConn net.Conn
@@ -284,8 +288,11 @@ func BenchmarkReverseListenerInbound(b *testing.B) {
 	}
 	benchmarkUnidirectionalStream(b, peerConn, waterConn)
 
-	err = waterConn.Close()
-	if err != nil {
+	if err = waterConn.Close(); err != nil {
+		b.Fatal(err)
+	}
+
+	if err = testLis.Close(); err != nil {
 		b.Fatal(err)
 	}
 }

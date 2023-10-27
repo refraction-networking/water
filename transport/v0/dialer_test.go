@@ -46,7 +46,6 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tcpLis.Close()
 
 	// goroutine to accept incoming connections
 	var peerConn net.Conn
@@ -188,6 +187,10 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 		t.Fatalf("conn.Read must fail after closing the conn")
 	}
 
+	if err := tcpLis.Close(); err != nil {
+		t.Fatal(err)
+	}
+
 	// trigger garbage collection
 	runtime.GC()
 	time.Sleep(100 * time.Microsecond)
@@ -208,7 +211,6 @@ func BenchmarkDialerOutbound(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer tcpLis.Close()
 
 	// goroutine to accept incoming connections
 	var peerConn net.Conn
@@ -248,8 +250,11 @@ func BenchmarkDialerOutbound(b *testing.B) {
 
 	benchmarkUnidirectionalStream(b, waterConn, peerConn)
 
-	err = waterConn.Close()
-	if err != nil {
+	if err = waterConn.Close(); err != nil {
+		b.Fatal(err)
+	}
+
+	if err = tcpLis.Close(); err != nil {
 		b.Fatal(err)
 	}
 }
@@ -261,7 +266,6 @@ func BenchmarkReverseDialerOutbound(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer tcpLis.Close()
 
 	// goroutine to accept incoming connections
 	var peerConn net.Conn
@@ -301,8 +305,11 @@ func BenchmarkReverseDialerOutbound(b *testing.B) {
 
 	benchmarkUnidirectionalStream(b, waterConn, peerConn)
 
-	err = waterConn.Close()
-	if err != nil {
+	if err = waterConn.Close(); err != nil {
+		b.Fatal(err)
+	}
+
+	if err = tcpLis.Close(); err != nil {
 		b.Fatal(err)
 	}
 }
