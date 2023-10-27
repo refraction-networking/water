@@ -42,7 +42,7 @@ func testDialerBadAddr(t *testing.T) {
 }
 
 func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
-	tcpLis, err := net.ListenTCP("tcp", nil)
+	tcpLis, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +204,7 @@ func testDialerPartialWATM(t *testing.T) {
 func BenchmarkDialerOutbound(b *testing.B) {
 	loadPlain()
 	// create random TCP listener listening on localhost
-	tcpLis, err := net.ListenTCP("tcp", nil)
+	tcpLis, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		b.Fatal(err)
 	}
