@@ -13,7 +13,7 @@ import (
 )
 
 func TestRelay(t *testing.T) {
-	loadPlain()
+	loadReverse()
 	t.Run("plain must work", testRelayPlain)
 }
 
@@ -37,7 +37,7 @@ func testRelayPlain(t *testing.T) { // skipcq: GO-R1005
 
 	// setup relay
 	config := &water.Config{
-		TMBin: plain,
+		TMBin: reverse,
 	}
 	relay, err := water.NewRelay(config)
 	if err != nil {
@@ -108,6 +108,11 @@ func testRelayPlain(t *testing.T) { // skipcq: GO-R1005
 			t.Fatalf("serverConn.Read error: read %d bytes, want %d bytes", n, len(clientSendBuf))
 		}
 
+		// reverse clientSendBuf
+		for i := 0; i < len(clientSendBuf)/2; i++ {
+			clientSendBuf[i], clientSendBuf[len(clientSendBuf)-1-i] = clientSendBuf[len(clientSendBuf)-1-i], clientSendBuf[i]
+		}
+
 		if !bytes.Equal(serverRecvBuf[:n], clientSendBuf) {
 			t.Fatalf("serverRecvBuf != clientSendBuf")
 		}
@@ -125,6 +130,11 @@ func testRelayPlain(t *testing.T) { // skipcq: GO-R1005
 
 		if n != len(serverSendBuf) {
 			t.Fatalf("clientConn.Read error: read %d bytes, want %d bytes", n, len(serverSendBuf))
+		}
+
+		// reverse serverSendBuf
+		for i := 0; i < len(serverSendBuf)/2; i++ {
+			serverSendBuf[i], serverSendBuf[len(serverSendBuf)-1-i] = serverSendBuf[len(serverSendBuf)-1-i], serverSendBuf[i]
 		}
 
 		if !bytes.Equal(clientRecvBuf[:n], serverSendBuf) {
@@ -159,7 +169,7 @@ func testRelayPlain(t *testing.T) { // skipcq: GO-R1005
 		t.Fatal(err)
 	}
 
-	if string(serverRecvBuf[:n]) != "hello" {
-		t.Fatalf("serverRecvBuf != \"hello\"")
+	if string(serverRecvBuf[:n]) != "olleh" {
+		t.Fatalf("serverRecvBuf != \"olleh\"")
 	}
 }

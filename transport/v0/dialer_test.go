@@ -14,7 +14,7 @@ import (
 )
 
 func TestDialer(t *testing.T) {
-	loadPlain()
+	loadReverse()
 	t.Run("plain must work", testDialerPlain)
 	t.Run("bad addr must fail", testDialerBadAddr)
 	t.Run("partial WATM must fail", testDialerPartialWATM)
@@ -23,7 +23,7 @@ func TestDialer(t *testing.T) {
 func testDialerBadAddr(t *testing.T) {
 	// Dial
 	config := &water.Config{
-		TMBin: plain,
+		TMBin: reverse,
 	}
 
 	dialer, err := water.NewDialer(config)
@@ -60,7 +60,7 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 
 	// Dial using water
 	config := &water.Config{
-		TMBin: plain,
+		TMBin: reverse,
 	}
 	dialer, err := water.NewDialer(config)
 	if err != nil {
@@ -124,6 +124,11 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 			t.Fatalf("peerConn.Read error: read %d bytes, want %d bytes", n, len(waterSendBuf))
 		}
 
+		// reverse the waterSendBuf
+		for i := 0; i < len(waterSendBuf)/2; i++ {
+			waterSendBuf[i], waterSendBuf[len(waterSendBuf)-1-i] = waterSendBuf[len(waterSendBuf)-1-i], waterSendBuf[i]
+		}
+
 		if !bytes.Equal(peerRecvBuf[:n], waterSendBuf) {
 			t.Fatalf("peerRecvBuf != waterSendBuf")
 		}
@@ -141,6 +146,11 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 
 		if n != len(peerSendBuf) {
 			t.Fatalf("conn.Read error: read %d bytes, want %d bytes", n, len(peerSendBuf))
+		}
+
+		// reverse the peerSendBuf
+		for i := 0; i < len(peerSendBuf)/2; i++ {
+			peerSendBuf[i], peerSendBuf[len(peerSendBuf)-1-i] = peerSendBuf[len(peerSendBuf)-1-i], peerSendBuf[i]
 		}
 
 		if !bytes.Equal(waterRecvBuf[:n], peerSendBuf) {
@@ -231,46 +241,68 @@ func BenchmarkDialerOutbound(b *testing.B) {
 		b.Fatal(goroutineErr)
 	}
 
-	var sendMsg []byte = make([]byte, 1024)
-	_, err = rand.Read(sendMsg)
+	err = sanityCheckConn(peerConn, waterConn, []byte("hello"), []byte("hello"))
 	if err != nil {
-		b.Fatalf("rand.Read error: %s", err)
+		b.Fatal(err)
 	}
 
-	// setup a goroutine to read from the peerConn
-	var wg2 *sync.WaitGroup = new(sync.WaitGroup)
-	var peerRecvErr error
-	wg2.Add(1)
+	benchmarkUnidirectionalStream(b, waterConn, peerConn)
+
+	err = waterConn.Close()
+	if err != nil {
+		b.Fatal(err)
+	}
+}
+
+func BenchmarkReverseDialerOutbound(b *testing.B) {
+	loadReverse()
+	// create random TCP listener listening on localhost
+	tcpLis, err := net.ListenTCP("tcp", nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer tcpLis.Close()
+
+	// goroutine to accept incoming connections
+	var peerConn net.Conn
+	var goroutineErr error
+	var wg *sync.WaitGroup = new(sync.WaitGroup)
+	wg.Add(1)
 	go func() {
-		defer wg2.Done()
-		recvBytes := 0
-		var n int
-		recvbuf := make([]byte, 1024+1) //
-		for recvBytes < b.N*1024 {
-			n, peerRecvErr = peerConn.Read(recvbuf)
-			recvBytes += n
-			if peerRecvErr != nil {
-				return
-			}
-		}
+		defer wg.Done()
+		peerConn, goroutineErr = tcpLis.Accept()
 	}()
 
-	runtime.GC()
-	time.Sleep(10 * time.Millisecond)
-
-	b.SetBytes(1024)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err = waterConn.Write(sendMsg)
-		if err != nil {
-			b.Logf("Write error, cntr: %d, N: %d", i, b.N)
-			b.Fatal(err)
-		}
+	// Dial
+	config := &water.Config{
+		TMBin: reverse,
 	}
-	wg2.Wait()
-	b.StopTimer()
+	dialer, err := water.NewDialer(config)
+	if err != nil {
+		b.Fatal(err)
+	}
 
-	if peerRecvErr != nil {
-		b.Fatal(peerRecvErr)
+	waterConn, err := dialer.Dial("tcp", tcpLis.Addr().String())
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer waterConn.Close()
+
+	// wait for listener to accept connection
+	wg.Wait()
+	if goroutineErr != nil {
+		b.Fatal(goroutineErr)
+	}
+
+	err = sanityCheckConn(peerConn, waterConn, []byte("hello"), []byte("olleh"))
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	benchmarkUnidirectionalStream(b, waterConn, peerConn)
+
+	err = waterConn.Close()
+	if err != nil {
+		b.Fatal(err)
 	}
 }

@@ -14,7 +14,7 @@ import (
 )
 
 func TestListener(t *testing.T) {
-	loadPlain()
+	loadReverse()
 	t.Run("plain must work", testListenerPlain)
 	t.Run("bad addr must fail", testListenerBadAddr)
 	t.Run("partial WATM must fail", testListenerPartialWATM)
@@ -23,7 +23,7 @@ func TestListener(t *testing.T) {
 func testListenerBadAddr(t *testing.T) {
 	// prepare
 	config := &water.Config{
-		TMBin: plain,
+		TMBin: reverse,
 	}
 
 	_, err := config.Listen("tcp", "256.267.278.289:2023")
@@ -39,7 +39,7 @@ func testListenerBadAddr(t *testing.T) {
 func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 	// prepare
 	config := &water.Config{
-		TMBin: plain,
+		TMBin: reverse,
 	}
 
 	testLis, err := config.Listen("tcp", "localhost:0")
@@ -117,6 +117,11 @@ func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 			t.Fatalf("lisConn.Read error: read %d bytes, want %d bytes", n, len(waterSendBuf))
 		}
 
+		// reverse the waterSendBuf
+		for i := 0; i < len(waterSendBuf)/2; i++ {
+			waterSendBuf[i], waterSendBuf[len(waterSendBuf)-1-i] = waterSendBuf[len(waterSendBuf)-1-i], waterSendBuf[i]
+		}
+
 		if !bytes.Equal(peerRecvBuf[:n], waterSendBuf) {
 			t.Fatalf("peerRecvBuf != waterSendBuf")
 		}
@@ -134,6 +139,11 @@ func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 
 		if n != len(peerSendBuf) {
 			t.Fatalf("conn.Read error: read %d bytes, want %d bytes", n, len(peerSendBuf))
+		}
+
+		// reverse the peerSendBuf
+		for i := 0; i < len(peerSendBuf)/2; i++ {
+			peerSendBuf[i], peerSendBuf[len(peerSendBuf)-1-i] = peerSendBuf[len(peerSendBuf)-1-i], peerSendBuf[i]
 		}
 
 		if !bytes.Equal(waterRecvBuf[:n], peerSendBuf) {
@@ -198,13 +208,13 @@ func BenchmarkListenerInbound(b *testing.B) {
 	defer testLis.Close()
 
 	// goroutine to accept incoming connections
-	var conn net.Conn
+	var waterConn net.Conn
 	var goroutineErr error
 	var wg *sync.WaitGroup = new(sync.WaitGroup)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		conn, goroutineErr = testLis.Accept()
+		waterConn, goroutineErr = testLis.Accept()
 	}()
 
 	// Dial with net.Dial
@@ -219,48 +229,65 @@ func BenchmarkListenerInbound(b *testing.B) {
 	if goroutineErr != nil {
 		b.Fatal(goroutineErr)
 	}
-	defer conn.Close() // skipcq: GO-S2307
+	defer waterConn.Close() // skipcq: GO-S2307
 
-	var sendMsg []byte = make([]byte, 1024)
-	_, err = rand.Read(sendMsg)
+	err = sanityCheckConn(peerConn, waterConn, []byte("hello"), []byte("hello"))
 	if err != nil {
-		b.Fatalf("rand.Read error: %s", err)
+		b.Fatal(err)
+	}
+	benchmarkUnidirectionalStream(b, peerConn, waterConn)
+
+	err = waterConn.Close()
+	if err != nil {
+		b.Fatal(err)
+	}
+}
+
+func BenchmarkReverseListenerInbound(b *testing.B) {
+	loadReverse()
+	// prepare
+	config := &water.Config{
+		TMBin: reverse,
 	}
 
-	// setup a goroutine to read from the conn
-	var wg2 *sync.WaitGroup = new(sync.WaitGroup)
-	var waterRecvErr error
-	wg2.Add(1)
+	testLis, err := config.Listen("tcp", "localhost:0")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer testLis.Close()
+
+	// goroutine to accept incoming connections
+	var waterConn net.Conn
+	var goroutineErr error
+	var wg *sync.WaitGroup = new(sync.WaitGroup)
+	wg.Add(1)
 	go func() {
-		defer wg2.Done()
-		recvBytes := 0
-		var n int
-		recvbuf := make([]byte, 1024+1) //
-		for recvBytes < b.N*1024 {
-			n, waterRecvErr = conn.Read(recvbuf)
-			recvBytes += n
-			if waterRecvErr != nil {
-				return
-			}
-		}
+		defer wg.Done()
+		waterConn, goroutineErr = testLis.Accept()
 	}()
 
-	runtime.GC()
-	time.Sleep(10 * time.Millisecond)
-
-	b.SetBytes(1024)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err = peerConn.Write(sendMsg)
-		if err != nil {
-			b.Logf("Write error, cntr: %d, N: %d", i, b.N)
-			b.Fatal(err)
-		}
+	// Dial with net.Dial
+	peerConn, err := net.Dial("tcp", testLis.Addr().String())
+	if err != nil {
+		b.Fatal(err)
 	}
-	wg2.Wait()
-	b.StopTimer()
+	defer peerConn.Close() // skipcq: GO-S2307
 
-	if waterRecvErr != nil {
-		b.Fatal(waterRecvErr)
+	// wait for listener to accept connection
+	wg.Wait()
+	if goroutineErr != nil {
+		b.Fatal(goroutineErr)
+	}
+	defer waterConn.Close() // skipcq: GO-S2307
+
+	err = sanityCheckConn(peerConn, waterConn, []byte("hello"), []byte("olleh"))
+	if err != nil {
+		b.Fatal(err)
+	}
+	benchmarkUnidirectionalStream(b, peerConn, waterConn)
+
+	err = waterConn.Close()
+	if err != nil {
+		b.Fatal(err)
 	}
 }

@@ -3,12 +3,9 @@
 package v0_test
 
 import (
-	"crypto/rand"
 	"net"
-	"runtime"
 	"sync"
 	"testing"
-	"time"
 )
 
 // BenchmarkTCPReference can be used as a reference to compare to the
@@ -46,46 +43,5 @@ func BenchmarkTCPReference(b *testing.B) {
 	}
 	defer lConn.Close()
 
-	var sendMsg []byte = make([]byte, 1024)
-	_, err = rand.Read(sendMsg)
-	if err != nil {
-		b.Fatalf("rand.Read error: %s", err)
-	}
-
-	// setup a goroutine to read from the conn
-	var wg2 *sync.WaitGroup = new(sync.WaitGroup)
-	var listenerRecvErr error
-	wg2.Add(1)
-	go func() {
-		defer wg2.Done()
-		recvBytes := 0
-		var n int
-		recvbuf := make([]byte, 1024+1) //
-		for recvBytes < b.N*1024 {
-			n, listenerRecvErr = lConn.Read(recvbuf)
-			recvBytes += n
-			if listenerRecvErr != nil {
-				return
-			}
-		}
-	}()
-
-	runtime.GC()
-	time.Sleep(10 * time.Millisecond)
-
-	b.SetBytes(1024)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err = dConn.Write(sendMsg)
-		if err != nil {
-			b.Logf("Write error, cntr: %d, N: %d", i, b.N)
-			b.Fatal(err)
-		}
-	}
-	wg2.Wait()
-	b.StopTimer()
-
-	if listenerRecvErr != nil {
-		b.Fatal(listenerRecvErr)
-	}
+	benchmarkUnidirectionalStream(b, dConn, lConn)
 }
