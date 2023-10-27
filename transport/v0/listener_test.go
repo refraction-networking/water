@@ -229,7 +229,6 @@ func BenchmarkListenerInbound(b *testing.B) {
 	if goroutineErr != nil {
 		b.Fatal(goroutineErr)
 	}
-	defer waterConn.Close() // skipcq: GO-S2307
 
 	err = sanityCheckConn(peerConn, waterConn, []byte("hello"), []byte("hello"))
 	if err != nil {
@@ -278,7 +277,6 @@ func BenchmarkReverseListenerInbound(b *testing.B) {
 	if goroutineErr != nil {
 		b.Fatal(goroutineErr)
 	}
-	defer waterConn.Close() // skipcq: GO-S2307
 
 	err = sanityCheckConn(peerConn, waterConn, []byte("hello"), []byte("olleh"))
 	if err != nil {
