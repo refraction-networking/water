@@ -22,18 +22,15 @@ import (
 //
 // As shown above, a Listener consists of a net.Listener to accept
 // incoming connections and a WATM to handle the incoming connections
-// from an external source. Accept() returns a Conn that caller may
+// from an external source. Accept() returns a net.Conn that caller may
 // Read()-from or Write()-to.
 type Listener interface {
-	// Accept waits for and returns the next connection to the listener.
-	Accept() (Conn, error)
+	// Listener implements net.Listener
+	net.Listener
 
-	// Close closes the listener.
-	// Any blocked Accept operations will be unblocked and return errors.
-	Close() error
-
-	// Addr returns the listener's network address.
-	Addr() net.Addr
+	// AcceptWATER waits for and returns the next connection to the listener
+	// as a water.Conn.
+	AcceptWATER() (Conn, error)
 
 	mustEmbedUnimplementedListener()
 }
@@ -55,19 +52,24 @@ var (
 // It is used to ensure forward compatibility of the Listener interface.
 type UnimplementedListener struct{}
 
-// Accept implements Listener.Accept().
-func (*UnimplementedListener) Accept() (Conn, error) {
+// Accept implements net.Listener.Accept().
+func (*UnimplementedListener) Accept() (net.Conn, error) {
 	return nil, ErrUnimplementedListener
 }
 
-// Close implements Listener.Close().
+// Close implements net.Listener.Close().
 func (*UnimplementedListener) Close() error {
 	return ErrUnimplementedListener
 }
 
-// Addr implements Listener.Addr().
+// Addr implements net.Listener.Addr().
 func (*UnimplementedListener) Addr() net.Addr {
 	return nil
+}
+
+// AcceptWATER implements water.Listener.AcceptWATER().
+func (*UnimplementedListener) AcceptWATER() (Conn, error) {
+	return nil, ErrUnimplementedListener
 }
 
 // mustEmbedUnimplementedListener is a function that developers cannot
