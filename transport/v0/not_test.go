@@ -81,6 +81,12 @@ func benchmarkUnidirectionalStream(b *testing.B, wrConn, rdConn net.Conn) {
 			b.Logf("Write error, cntr: %d, N: %d", i, b.N)
 			b.Fatal(err)
 		}
+
+		_, err := rand.Read(sendMsg)
+		if err != nil {
+			b.Fatalf("rand.Read error: %s", err)
+		}
+		// time.Sleep(10 * time.Nanosecond) // simulate some other work to prepare for the next write
 	}
 	wg2.Wait()
 	b.StopTimer()
