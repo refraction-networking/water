@@ -1,6 +1,9 @@
 package water
 
-import "errors"
+import (
+	"errors"
+	"net"
+)
 
 // Relay listens on a local network address and handles requests
 // on incoming connections by passing the incoming connection to
@@ -32,6 +35,11 @@ type Relay interface {
 	// does not close the established connections.
 	Close() error
 
+	// Addr returns the local address the relay is listening on.
+	//
+	// If no address is available, instead of panicking it returns nil.
+	Addr() net.Addr
+
 	mustEmbedUnimplementedRelay()
 }
 
@@ -43,8 +51,9 @@ var (
 	ErrRelayAlreadyRegistered = errors.New("water: relay already registered")
 	ErrRelayVersionNotFound   = errors.New("water: relay version not found")
 	ErrUnimplementedRelay     = errors.New("water: unimplemented relay")
+	ErrRelayAlreadyStarted    = errors.New("water: relay already started") // RelayTo and ListenAndRelayTo may return this error if a relay was reused.
 
-	ErrRelayAlreadyStarted = errors.New("water: relay already started") // RelayTo and ListenAndRelayTo may return this error if a relay was reused.
+	_ Relay = (*UnimplementedRelay)(nil) // type guard
 )
 
 // UnimplementedRelay is a Relay that always returns errors.
@@ -65,6 +74,11 @@ func (*UnimplementedRelay) ListenAndRelayTo(_, _, _, _ string) error {
 // Close implements Relay.Close().
 func (*UnimplementedRelay) Close() error {
 	return ErrUnimplementedRelay
+}
+
+// Addr implements Relay.Addr().
+func (*UnimplementedRelay) Addr() net.Addr {
+	return nil
 }
 
 // mustEmbedUnimplementedRelay is a function that developers cannot

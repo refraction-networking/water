@@ -1,5 +1,3 @@
-//go:build !exclude_v0
-
 package v0
 
 import (
@@ -42,22 +40,7 @@ func NewListener(c *water.Config) (water.Listener, error) {
 //
 // Implements net.Listener.
 func (l *Listener) Accept() (net.Conn, error) {
-	if l.closed.Load() {
-		return nil, fmt.Errorf("water: listener is closed")
-	}
-
-	if l.config == nil {
-		return nil, fmt.Errorf("water: accept with nil config is not allowed")
-	}
-
-	var core water.Core
-	var err error
-	core, err = water.NewCore(l.config)
-	if err != nil {
-		return nil, err
-	}
-
-	return accept(core)
+	return l.AcceptWATER()
 }
 
 // Close closes the listener.
@@ -75,4 +58,25 @@ func (l *Listener) Close() error {
 // Implements net.Listener.
 func (l *Listener) Addr() net.Addr {
 	return l.config.NetworkListener.Addr()
+}
+
+// AcceptWATER waits for and returns the next connection to the listener
+// as a water.Conn.
+func (l *Listener) AcceptWATER() (water.Conn, error) {
+	if l.closed.Load() {
+		return nil, fmt.Errorf("water: listener is closed")
+	}
+
+	if l.config == nil {
+		return nil, fmt.Errorf("water: accept with nil config is not allowed")
+	}
+
+	var core water.Core
+	var err error
+	core, err = water.NewCore(l.config)
+	if err != nil {
+		return nil, err
+	}
+
+	return accept(core)
 }
