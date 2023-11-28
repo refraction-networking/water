@@ -1,13 +1,13 @@
 # W.A.T.E.R.: WebAssembly Transport Executables Runtime
-[![License](https://img.shields.io/badge/License-Apache_2.0-yellowgreen.svg)](https://opensource.org/licenses/Apache-2.0) 
+![GitHub License](https://img.shields.io/github/license/gaukas/water?label=License)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgaukas%2Fwater.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgaukas%2Fwater?ref=badge_shield&issueType=license)
 [![Build Status](https://github.com/gaukas/water/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/gaukas/water/actions/workflows/go.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/gaukas/water.svg)](https://pkg.go.dev/github.com/gaukas/water)
-[![DeepSource](https://app.deepsource.com/gh/gaukas/water.svg/?label=resolved+issues&show_trend=true&token=SonUOOtyjJHnPuIdEBGZp4zx)](https://app.deepsource.com/gh/gaukas/water/)
+<!-- [![DeepSource](https://app.deepsource.com/gh/gaukas/water.svg/?label=resolved+issues&show_trend=true&token=SonUOOtyjJHnPuIdEBGZp4zx)](https://app.deepsource.com/gh/gaukas/water/) -->
 
 <div style="width: 100%; height = 160px">
     <div style="width: 75%; height: 150px; float: left;"> 
-        WATER-go provides a golang runtime for WebAssembly Transport Modules(WATM) as a pluggable
+        WATER-go provides a Go runtime for WebAssembly Transport Modules(WATM) as a pluggable
         application-layer transport protocol provider. It is designed to be highly portable and
         lightweight, allowing for rapidly deployable pluggable transports. While other pluggable
         transport implementations require a fresh client deployment (and app-store review) to update
@@ -20,8 +20,11 @@
     </div>
 </div>
 
-Information about writing, buiding, and sharing WebAssembly Transport Modules can be found in the
-[water-rs](https://github.com/erikziyunchi/water-rs/tree/main/crates/wasm) library. 
+The Rust implementation of the runtime library and information about writing, buiding, and sharing WebAssembly Transport Modules(WATM) can be found in [water-rs](https://github.com/erikziyunchi/water-rs). 
+
+## Contents
+
+This repo contains a Go package `water`, a runtime library used to interact with `.wasm` WebAssembly Transport Modules(WATM). 
 
 # Usage
 
