@@ -40,8 +40,8 @@ func UnixConnWrap(obj any) (*net.UnixConn, error) {
 			// when the src is closed, we will close the dst
 			time.Sleep(1 * time.Millisecond)
 			log.Debugf("closing reverseUnixConn and unixConn")
-			err = reverseUnixConn.Close()
-			err = unixConn.Close()
+			_ = reverseUnixConn.Close()
+			_ = unixConn.Close()
 		}()
 	}
 
@@ -61,7 +61,16 @@ func UnixConnWrap(obj any) (*net.UnixConn, error) {
 	return unixConn, nil
 }
 
-func UnixConnFileWrap(obj any) (*os.File, error) {
+// UnixConnFileWrap wraps an object into a *os.File from an
+// underlying net.UnixConn. The object must implement io.Reader
+// and/or io.Writer.
+//
+// If the object implements io.Reader, upon completing copying
+// the object to the returned *os.File, the callback functions
+// will be called.
+//
+// It is caller's responsibility to close the returned *os.File.
+func UnixConnFileWrap(obj any, callbacks ...func()) (*os.File, error) {
 	// get a pair of connected UnixConn
 	unixConn, reverseUnixConn, err := UnixConnPair()
 	if err != nil && (unixConn == nil || reverseUnixConn == nil) {
@@ -80,9 +89,11 @@ func UnixConnFileWrap(obj any) (*os.File, error) {
 			// when the src is closed, we will close the dst
 			time.Sleep(1 * time.Millisecond)
 			log.Debugf("closing reverseUnixConn and unixConn")
-			reverseUnixConn.Close()
+			for _, f := range callbacks {
+				f()
+			}
+			_ = reverseUnixConn.Close()
 			_ = unixConn.Close()
-			_ = unixConnFile.Close()
 		}()
 	}
 
@@ -102,6 +113,7 @@ func UnixConnFileWrap(obj any) (*os.File, error) {
 	return unixConnFile, nil
 }
 
+// UnixConnPair returns a pair of connected net.UnixConn.
 func UnixConnPair(path ...string) (*net.UnixConn, *net.UnixConn, error) {
 	var c1, c2 net.Conn
 

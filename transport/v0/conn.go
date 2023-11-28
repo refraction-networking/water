@@ -19,7 +19,7 @@ import (
 type Conn struct {
 	// callerConn is used by DialV0() and AcceptV0(). It is used to talk to
 	// the caller of water API by allowing the caller to Read() and Write() to it.
-	callerConn net.Conn // the connection from the caller, usually a *net.UnixConn
+	callerConn net.Conn // the connection from the caller, usually a *net.TCPConnPair
 
 	// srcConn is used by AcceptV0() and RelayV0(). It is used
 	// to talk to a remote source by accepting a connection from it.
@@ -56,13 +56,13 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 		return nil, err
 	}
 
-	reverseCallerConn, callerConn, err := socket.UnixConnPair()
+	reverseCallerConn, callerConn, err := socket.TCPConnPair()
 	// wasmCallerConn, conn.uoConn, err = socket.TCPConnPair()
 	if err != nil {
 		if reverseCallerConn == nil || callerConn == nil {
-			return nil, fmt.Errorf("water: socket.UnixConnPair returned error: %w", err)
+			return nil, fmt.Errorf("water: socket.TCPConnPair returned error: %w", err)
 		} else { // likely due to Close() call errored
-			log.Errorf("water: socket.UnixConnPair returned error: %v", err)
+			log.Errorf("water: socket.TCPConnPair returned error: %v", err)
 		}
 	}
 	conn.callerConn = callerConn
@@ -107,15 +107,15 @@ func accept(core water.Core) (c water.Conn, err error) {
 		return nil, err
 	}
 
-	reverseCallerConn, callerConn, err := socket.UnixConnPair()
+	reverseCallerConn, callerConn, err := socket.TCPConnPair()
 	if err != nil {
 		if reverseCallerConn == nil || callerConn == nil {
-			return nil, fmt.Errorf("water: socket.UnixConnPair returned error: %w", err)
+			return nil, fmt.Errorf("water: socket.TCPConnPair returned error: %w", err)
 		} else { // likely due to Close() call errored
-			log.Errorf("water: socket.UnixConnPair returned error: %v", err)
+			log.Errorf("water: socket.TCPConnPair returned error: %v", err)
 		}
 	} else if reverseCallerConn == nil || callerConn == nil {
-		return nil, errors.New("water: socket.UnixConnPair returned nil")
+		return nil, errors.New("water: socket.TCPConnPair returned nil")
 	}
 
 	conn.callerConn = callerConn
