@@ -22,9 +22,15 @@
 
 The Rust implementation of the runtime library and information about writing, buiding, and sharing WebAssembly Transport Modules(WATM) can be found in [water-rs](https://github.com/erikziyunchi/water-rs). 
 
+## Be Water
+
+> Empty your mind, be formless. Shapeless, like water. If you put water into a cup, it becomes the cup. You put water into a bottle and it becomes the bottle. You put it in a teapot, it becomes the teapot. Now, water can flow or it can crash. Be water, my friend.
+>
+> -- Bruce Lee
+
 ## Contents
 
-This repo contains a Go package `water`, a runtime library used to interact with `.wasm` WebAssembly Transport Modules(WATM). 
+This repo contains a Go package `water`, which implements the runtime library used to interact with `.wasm` WebAssembly Transport Modules(WATM). 
 
 # Usage
 
