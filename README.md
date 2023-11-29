@@ -1,8 +1,8 @@
 # W.A.T.E.R.: WebAssembly Transport Executables Runtime
-![GitHub License](https://img.shields.io/github/license/gaukas/water?label=License)
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgaukas%2Fwater.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgaukas%2Fwater?ref=badge_shield&issueType=license)
-[![Build Status](https://github.com/gaukas/water/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/gaukas/water/actions/workflows/go.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/gaukas/water.svg)](https://pkg.go.dev/github.com/gaukas/water)
+![License](https://img.shields.io/github/license/gaukas/water?label=License)
+[![FOSSA](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgaukas%2Fwater.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgaukas%2Fwater?ref=badge_shield&issueType=license)
+[![CI](https://github.com/gaukas/water/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/gaukas/water/actions/workflows/go.yml)
+[![Go Doc](https://pkg.go.dev/badge/github.com/gaukas/water.svg)](https://pkg.go.dev/github.com/gaukas/water)
 <!-- [![DeepSource](https://app.deepsource.com/gh/gaukas/water.svg/?label=resolved+issues&show_trend=true&token=SonUOOtyjJHnPuIdEBGZp4zx)](https://app.deepsource.com/gh/gaukas/water/) -->
 
 <div style="width: 100%; height = 160px">
@@ -22,9 +22,15 @@
 
 The Rust implementation of the runtime library and information about writing, buiding, and sharing WebAssembly Transport Modules(WATM) can be found in [water-rs](https://github.com/erikziyunchi/water-rs). 
 
+## Be Water
+
+> Empty your mind, be formless, shapeless, like water. If you put water into a cup, it becomes the cup. You put water into a bottle and it becomes the bottle. You put it in a teapot, it becomes the teapot. Now, water can flow or it can crash. Be water, my friend.
+>
+> -- Bruce Lee
+
 ## Contents
 
-This repo contains a Go package `water`, a runtime library used to interact with `.wasm` WebAssembly Transport Modules(WATM). 
+This repo contains a Go package `water`, which implements the runtime library used to interact with `.wasm` WebAssembly Transport Modules(WATM). 
 
 # Usage
 
