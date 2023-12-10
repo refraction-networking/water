@@ -22,6 +22,23 @@
 
 The Rust implementation of the runtime library and information about writing, buiding, and sharing WebAssembly Transport Modules(WATM) can be found in [water-rs](https://github.com/erikziyunchi/water-rs). 
 
+If you quoted or used our work, please cite our paper [Just add WATER: WebAssembly-based Circumvention Transports](https://arxiv.org/pdf/2312.00163.pdf) in your work.
+
+<details>
+  <summary>BibTeX</summary>
+    
+  ```bibtex
+  @misc{chi2023just,
+    title={Just add WATER: WebAssembly-based Circumvention Transports}, 
+    author={Erik Chi and Gaukas Wang and J. Alex Halderman and Eric Wustrow and Jack Wampler},
+    year={2023},
+    eprint={2312.00163},
+    archivePrefix={arXiv},
+    primaryClass={cs.CR}
+  }
+  ```
+</details>
+
 ## Be Water
 
 > Empty your mind, be formless, shapeless, like water. If you put water into a cup, it becomes the cup. You put water into a bottle and it becomes the bottle. You put it in a teapot, it becomes the teapot. Now, water can flow or it can crash. Be water, my friend.
