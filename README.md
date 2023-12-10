@@ -3,7 +3,6 @@
 [![FOSSA](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgaukas%2Fwater.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgaukas%2Fwater?ref=badge_shield&issueType=license)
 [![CI](https://github.com/gaukas/water/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/gaukas/water/actions/workflows/go.yml)
 [![Go Doc](https://pkg.go.dev/badge/github.com/gaukas/water.svg)](https://pkg.go.dev/github.com/gaukas/water)
-<!-- [![DeepSource](https://app.deepsource.com/gh/gaukas/water.svg/?label=resolved+issues&show_trend=true&token=SonUOOtyjJHnPuIdEBGZp4zx)](https://app.deepsource.com/gh/gaukas/water/) -->
 
 <div style="width: 100%; height = 160px">
     <div style="width: 75%; height: 150px; float: left;"> 
