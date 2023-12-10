@@ -22,6 +22,8 @@
 
 The Rust implementation of the runtime library and information about writing, buiding, and sharing WebAssembly Transport Modules(WATM) can be found in [water-rs](https://github.com/erikziyunchi/water-rs). 
 
+### Citation Information
+
 If you quoted or used our work, please cite our paper [Just add WATER: WebAssembly-based Circumvention Transports](https://arxiv.org/pdf/2312.00163.pdf) in your work.
 
 <details>
