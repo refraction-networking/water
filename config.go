@@ -31,14 +31,14 @@ type Config struct {
 	// the WASM Transport Module.
 	TMConfig TMConfig
 
-	// wasiConfigFactory is used to replicate the WASI config for each WASM
-	// instance created. This field is for advanced use cases and/or debugging
-	// purposes only.
+	// ModuleConfigFactory is used to configure the system resource of
+	// each WASM instance created. This field is for advanced use cases
+	// and/or debugging purposes only.
 	//
-	// Caller is supposed to call c.WASIConfig() to get the pointer to the
-	// WASIConfigFactory. If the pointer is nil, a new WASIConfigFactory will
+	// Caller is supposed to call c.ModuleConfig() to get the pointer to the
+	// ModuleConfigFactory. If the pointer is nil, a new ModuleConfigFactory will
 	// be created and returned.
-	wasiConfigFactory *wasm.WASIConfigFactory
+	ModuleConfigFactory *wasm.ModuleConfigFactory
 }
 
 // Clone creates a deep copy of the Config.
@@ -51,11 +51,11 @@ func (c *Config) Clone() *Config {
 	copy(wasmClone, c.TMBin)
 
 	return &Config{
-		TMBin:             c.TMBin,
-		NetworkDialerFunc: c.NetworkDialerFunc,
-		NetworkListener:   c.NetworkListener,
-		TMConfig:          c.TMConfig,
-		wasiConfigFactory: c.wasiConfigFactory.Clone(),
+		TMBin:               c.TMBin,
+		NetworkDialerFunc:   c.NetworkDialerFunc,
+		NetworkListener:     c.NetworkListener,
+		TMConfig:            c.TMConfig,
+		ModuleConfigFactory: c.ModuleConfigFactory.Clone(),
 	}
 }
 
@@ -88,14 +88,18 @@ func (c *Config) WATMBinOrPanic() []byte {
 	return c.TMBin
 }
 
-// WASIConfig returns the WASIConfigFactory. If the pointer is
-// nil, a new WASIConfigFactory will be created and returned.
-func (c *Config) WASIConfig() *wasm.WASIConfigFactory {
-	if c.wasiConfigFactory == nil {
-		c.wasiConfigFactory = wasm.NewWasiConfigFactory()
+// ModuleConfig returns the ModuleConfigFactory. If the pointer is
+// nil, a new ModuleConfigFactory will be created and returned.
+func (c *Config) ModuleConfig() *wasm.ModuleConfigFactory {
+	if c.ModuleConfigFactory == nil {
+		c.ModuleConfigFactory = wasm.NewModuleConfigFactory()
+
+		// by default, stdout and stderr are inherited
+		c.ModuleConfigFactory.InheritStdout()
+		c.ModuleConfigFactory.InheritStderr()
 	}
 
-	return c.wasiConfigFactory
+	return c.ModuleConfigFactory
 }
 
 func (c *Config) Listen(network, address string) (Listener, error) {
