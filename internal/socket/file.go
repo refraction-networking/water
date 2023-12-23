@@ -34,7 +34,7 @@ func AsFile(f any) (*os.File, error) {
 		return f.File()
 	case io.ReadWriteCloser: // and also net.Conn
 		log.Debugf("%T implements only ReadWriteCloser and needs wrapping", f)
-		unixConn, err := UnixConnWrap(f)
+		unixConn, _, err := UnixConnWrap(f)
 		if err != nil {
 			return nil, err
 		}

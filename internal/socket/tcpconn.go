@@ -1,67 +1,15 @@
 package socket
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/gaukas/water/internal/log"
 )
-
-// TCPConnFileWrap wraps an object into a *os.File from an
-// underlying net.TCPConn. The object must implement io.Reader
-// and/or io.Writer.
-//
-// If the object implements io.Reader, upon completing copying
-// the object to the returned *os.File, the callback functions
-// will be called.
-//
-// It is caller's responsibility to close the returned *os.File.
-func TCPConnFileWrap(obj any, callbacks ...func()) (*os.File, error) {
-	// get a pair of connected UnixConn
-	tcpConn, reverseTCPConn, err := TCPConnPair()
-	if err != nil && (tcpConn == nil || reverseTCPConn == nil) {
-		return nil, err
-	}
-
-	tcpConnFile, err := tcpConn.File()
-	if err != nil {
-		return nil, err
-	}
-
-	// if the object implements io.Reader: read from the object and write to the reverseUnixConn
-	if reader, ok := obj.(io.Reader); ok {
-		go func() {
-			_, _ = io.Copy(reverseTCPConn, reader)
-			// when the src is closed, we will close the dst
-			time.Sleep(1 * time.Millisecond)
-			log.Debugf("closing reverseTCPConn and tcpConn")
-			for _, f := range callbacks {
-				f()
-			}
-			_ = reverseTCPConn.Close()
-			_ = tcpConn.Close()
-		}()
-	}
-
-	// if the object implements io.Writer: read from the reverseUnixConn and write to the object
-	if writer, ok := obj.(io.Writer); ok {
-		go func() {
-			_, _ = io.Copy(writer, reverseTCPConn)
-			// when the src is closed, we will close the dst
-			if closer, ok := obj.(io.Closer); ok {
-				time.Sleep(1 * time.Millisecond)
-				log.Debugf("closing obj")
-				_ = closer.Close()
-			}
-		}()
-	}
-
-	return tcpConnFile, nil
-}
 
 // TCPConnPair returns a pair of connected net.TCPConn.
 func TCPConnPair(address ...string) (c1, c2 *net.TCPConn, err error) {
@@ -103,4 +51,129 @@ func TCPConnPair(address ...string) (c1, c2 *net.TCPConn, err error) {
 	}
 
 	return c1, c2, l.Close()
+}
+
+// TCPConnWrap wraps an io.Reader/io.Writer/io.Closer
+// interface into a TCPConn.
+//
+// This function spins up goroutine(s) to copy data between the
+// ReadWrite(Close)r and the TCPConn. Anything written to the
+// TCPConn by caller will be written to the wrapped object if
+// the object implements io.Writer, and if the object implements
+// io.Reader, anything read by goroutine from the wrapped object
+// will be readable from the TCPConn by caller.
+//
+// Once this function is invoked, the caller should not perform I/O
+// operations on the wrapped connection anymore.
+//
+// The returned context.Context can be used to check if the connection
+// is still alive. If the connection is closed, the context will be
+// canceled.
+func TCPConnWrap(wrapped any) (wrapperConn *net.TCPConn, ctxCancel context.Context, err error) {
+	// get a pair of connected TCPConn
+	tcpConn, reverseTCPConn, err := TCPConnPair()
+	if err != nil && (tcpConn == nil || reverseTCPConn == nil) { // ignore error caused by closing TCP Listener
+		return nil, nil, err
+	}
+
+	var cancel context.CancelFunc
+	ctxCancel, cancel = context.WithCancel(context.Background())
+
+	reader, readerOk := wrapped.(io.Reader)
+	writer, writerOk := wrapped.(io.Writer)
+	var wg *sync.WaitGroup = new(sync.WaitGroup)
+	if !readerOk && !writerOk {
+		cancel()
+		return nil, nil, fmt.Errorf("wrapped does not implement io.Reader nor io.Writer")
+	} else if readerOk && !writerOk {
+		// only reader is implemented
+		log.Debugf("wrapped does not implement io.Writer, skipping copy from wrapped to wrapper")
+
+		wg.Add(1)
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
+			_, _ = io.Copy(reverseTCPConn, reader) // unsafe: error is ignored
+			_ = reverseTCPConn.Close()             // unsafe: error is ignored
+			_ = tcpConn.Close()                    // unsafe: error is ignored
+		}(wg)
+	} else if !readerOk && writerOk {
+		// only writer is implemented
+		log.Debugf("wrapped does not implement io.Reader, skipping copy from wrapper to wrapped")
+
+		wg.Add(1)
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
+			_, _ = io.Copy(writer, reverseTCPConn) // unsafe: error is ignored
+			// when the src is closed, we will close the dst (if implements io.Closer)
+			if closer, ok := wrapped.(io.Closer); ok {
+				_ = closer.Close() // unsafe: error is ignored
+			}
+		}(wg)
+	} else {
+		// both reader and writer are implemented
+		wg.Add(2)
+
+		// copy from wrapped to wrapper
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
+			_, _ = io.Copy(reverseTCPConn, reader) // unsafe: error is ignored
+			_ = reverseTCPConn.Close()             // unsafe: error is ignored
+			_ = tcpConn.Close()                    // unsafe: error is ignored
+		}(wg)
+
+		// copy from wrapper to wrapped
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
+			_, _ = io.Copy(writer, reverseTCPConn) // unsafe: error is ignored
+			// when the src is closed, we will close the dst (if implements io.Closer)
+			if closer, ok := wrapped.(io.Closer); ok {
+				_ = closer.Close() // unsafe: error is ignored
+			}
+		}(wg)
+	}
+
+	// spawn a goroutine to wait for all copying to finish
+	go func(wg *sync.WaitGroup) {
+		wg.Wait()
+		cancel()
+
+		// close again to make sure we don't forget to close anything
+		// if io.Reader or io.Writer is not implemented.
+
+		// close the reverseTCPConn
+		_ = reverseTCPConn.Close() // unsafe: error is ignored
+
+		// close the tcpConn
+		_ = tcpConn.Close() // unsafe: error is ignored
+
+		// close the wrapped
+		if closer, ok := wrapped.(io.Closer); ok {
+			_ = closer.Close() // unsafe: error is ignored
+		}
+	}(wg)
+
+	return tcpConn, ctxCancel, nil
+}
+
+// TCPConnFileWrap wraps an object into a *os.File from an
+// underlying net.TCPConn. The object must implement io.Reader
+// and/or io.Writer.
+//
+// If the object implements io.Reader, upon completing copying
+// the object to the returned *os.File, the callback functions
+// will be called.
+//
+// It is caller's responsibility to close the returned *os.File.
+func TCPConnFileWrap(wrapped any) (wrapperFile *os.File, ctxCancel context.Context, err error) {
+	tcpWrapperConn, ctxCancel, err := TCPConnWrap(wrapped)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	tcpWrapperFile, err := tcpWrapperConn.File()
+	if err != nil {
+		return nil, nil, fmt.Errorf("(*net.TCPConn).File returned error: %w", err)
+	}
+
+	return tcpWrapperFile, ctxCancel, nil
 }
