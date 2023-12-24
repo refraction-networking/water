@@ -335,7 +335,7 @@ func testListenerReverse(t *testing.T) { // skipcq: GO-R1005
 }
 
 func testListenerPartialWATM(t *testing.T) {
-	t.Skip() // TODO: implement this with a few WebAssembly Transport Modules which partially implement the v0 listener spec
+	t.Skip("skipping [testListenerPartialWATM]...") // TODO: implement this with a few WebAssembly Transport Modules which partially implement the v0 listener spec
 }
 
 // BenchmarkInboundListener currently measures only the inbound throughput

@@ -34,7 +34,11 @@ func (mcf *ModuleConfigFactory) Clone() *ModuleConfigFactory {
 
 // GetConfig returns the latest wazero.ModuleConfig.
 func (mcf *ModuleConfigFactory) GetConfig() (wazero.ModuleConfig, error) {
-	return mcf.moduleConfig, nil
+	if mcf == nil {
+		return wazero.NewModuleConfig(), nil
+	}
+
+	return mcf.moduleConfig.WithFSConfig(mcf.fsconfig), nil
 }
 
 func (mcf *ModuleConfigFactory) SetArgv(argv []string) {

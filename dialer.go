@@ -82,8 +82,8 @@ func NewDialer(c *Config) (Dialer, error) {
 	//
 	// TODO: detect the version of the WebAssembly Transport Module
 	// in a more organized way.
-	for _, export := range core.Module().Exports() {
-		if f, ok := knownDialerVersions[export.Name()]; ok {
+	for exportName := range core.Exports() {
+		if f, ok := knownDialerVersions[exportName]; ok {
 			return f(c)
 		}
 	}

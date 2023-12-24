@@ -12,7 +12,6 @@ import (
 	"github.com/gaukas/water"
 	"github.com/gaukas/water/internal/log"
 	"github.com/gaukas/water/internal/socket"
-	v0 "github.com/gaukas/water/internal/v0"
 )
 
 // Conn is the first experimental version of Conn implementation.
@@ -29,7 +28,7 @@ type Conn struct {
 	// to talk to a remote destination by actively dialing to it.
 	dstConn net.Conn // the connection to the remote destination, usually a *net.TCPConn
 
-	tm *v0.TransportModule
+	tm *TransportModule
 
 	closeOnce *sync.Once
 	closed    atomic.Bool
@@ -40,13 +39,13 @@ type Conn struct {
 // dial dials the network address using through the WASM module
 // while using the dialerFunc specified in core.config.
 func dial(core water.Core, network, address string) (c water.Conn, err error) {
-	tm := v0.Core2TransportModule(core)
+	tm := UpgradeCore(core)
 	conn := &Conn{
 		tm:        tm,
 		closeOnce: &sync.Once{},
 	}
 
-	dialer := v0.NewManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
+	dialer := NewManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
 
 	if err = conn.tm.LinkNetworkInterface(dialer, nil); err != nil {
 		return nil, err
@@ -93,7 +92,7 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 // accept accepts the network connection using through the WASM module
 // while using the net.Listener specified in core.config.
 func accept(core water.Core) (c water.Conn, err error) {
-	tm := v0.Core2TransportModule(core)
+	tm := UpgradeCore(core)
 	conn := &Conn{
 		tm:        tm,
 		closeOnce: &sync.Once{},
@@ -141,13 +140,13 @@ func accept(core water.Core) (c water.Conn, err error) {
 }
 
 func relay(core water.Core, network, address string) (c water.Conn, err error) {
-	tm := v0.Core2TransportModule(core)
+	tm := UpgradeCore(core)
 	conn := &Conn{
 		tm:        tm,
 		closeOnce: &sync.Once{},
 	}
 
-	dialer := v0.NewManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
+	dialer := NewManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
 
 	if err = conn.tm.LinkNetworkInterface(dialer, core.Config().NetworkListenerOrPanic()); err != nil {
 		return nil, err

@@ -28,8 +28,8 @@ func main() {
 	}
 	// configuring the standard out of the WebAssembly instance to inherit
 	// from the parent process
-	config.WASIConfig().InheritStdout()
-	config.WASIConfig().InheritStderr()
+	config.ModuleConfig().InheritStdout()
+	config.ModuleConfig().InheritStderr()
 
 	relay, err := water.NewRelay(config)
 	if err != nil {

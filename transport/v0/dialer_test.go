@@ -344,7 +344,7 @@ func testDialerReverse(t *testing.T) { // skipcq: GO-R1005
 }
 
 func testDialerPartialWATM(t *testing.T) {
-	t.Skip() // TODO: implement this with a few WebAssembly Transport Modules which partially implement the v0 dialer spec
+	t.Skip("skipping [testDialerPartialWATM]...") // TODO: implement this with a few WebAssembly Transport Modules which partially implement the v0 dialer spec
 }
 
 // BenchmarkDialerOutbound currently measures only the outbound throughput

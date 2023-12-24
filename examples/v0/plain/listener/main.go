@@ -30,8 +30,8 @@ func main() {
 	}
 	// configuring the standard out of the WebAssembly instance to inherit
 	// from the parent process
-	config.WASIConfig().InheritStdout()
-	config.WASIConfig().InheritStderr()
+	config.ModuleConfig().InheritStdout()
+	config.ModuleConfig().InheritStderr()
 
 	lis, err := config.Listen("tcp", localAddr)
 	if err != nil {

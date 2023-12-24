@@ -23,12 +23,24 @@ type Core interface {
 	// inspection/debugging purposes.
 	Config() *Config
 
+	// Context returns the base context used by the Core.
+	Context() context.Context
+
 	// Exports dumps all the exported functions and globals which
 	// are provided by the WebAssembly module.
 	//
 	// This function returns a map of export name to the type of
 	// the export.
 	Exports() map[string]api.ExternType
+
+	// ExportedFunction returns the exported function with the
+	// given name. If no function with the given name is exported,
+	// this function returns nil.
+	//
+	// It is caller's responsibility to ensure that the function
+	// returned has the correct signature, which can be checked
+	// by inspecting the returned api.Function.Definition().
+	ExportedFunction(name string) api.Function
 
 	// Imports dumps all the imported functions and globals which
 	// are required to be provided by the host environment to
@@ -48,25 +60,23 @@ type Core interface {
 	// This function can be called ONLY BEFORE calling Instantiate().
 	ImportFunction(module, name string, f any) error
 
-	// InsertTCPConn inserts a TCP connection into the WebAssembly
-	// Transport Module and returns the key of the inserted TCP
-	// connection as a file descriptor accessible from the WebAssembly
-	// instance.
+	// InsertConn inserts a net.Conn into the WebAssembly Transport
+	// Module and returns the key of the inserted connection as a
+	// file descriptor accessible from the WebAssembly instance.
 	//
 	// This function SHOULD be called only if the WebAssembly instance
 	// execution is blocked/halted/stopped. Otherwise, race conditions
 	// or undefined behaviors may occur.
-	InsertTCPConn(tcpConn *net.TCPConn) (fd int32, err error)
+	InsertConn(conn net.Conn) (fd int32, err error)
 
-	// InsertTCPListener inserts a TCP listener into the WebAssembly
-	// Transport Module and returns the key of the inserted TCP
-	// listener as a file descriptor accessible from the WebAssembly
-	// instance.
+	// InsertListener inserts a net.Listener into the WebAssembly
+	// Transport Module and returns the key of the inserted listener
+	// as a file descriptor accessible from the WebAssembly instance.
 	//
 	// This function SHOULD be called only if the WebAssembly instance
 	// execution is blocked/halted/stopped. Otherwise, race conditions
 	// or undefined behaviors may occur.
-	InsertTCPListener(tcpListener *net.TCPListener) (fd int32, err error)
+	InsertListener(tcpListener net.Listener) (fd int32, err error)
 
 	// InsertFile inserts a file into the WebAssembly Transport Module
 	// and returns the key of the inserted file as a file descriptor
@@ -80,6 +90,11 @@ type Core interface {
 	// Instantiate instantiates the module into a new instance of
 	// WebAssembly Transport Module.
 	Instantiate() error
+
+	// Invoke invokes a function in the WebAssembly instance.
+	//
+	// If the target function is not exported, this function returns an error.
+	Invoke(funcName string, params ...uint64) (results []uint64, err error)
 
 	// WASIPreview1 enables the WASI preview1 API.
 	//
@@ -150,6 +165,11 @@ func (c *core) Config() *Config {
 	return c.config
 }
 
+// Context implements Core.
+func (c *core) Context() context.Context {
+	return c.ctx
+}
+
 // Exports implements Core.
 func (c *core) Exports() map[string]api.ExternType {
 	c.exportsLoadOnce.Do(func() {
@@ -157,6 +177,15 @@ func (c *core) Exports() map[string]api.ExternType {
 	})
 
 	return c.exports
+}
+
+// ExportedFunction implements Core.
+func (c *core) ExportedFunction(name string) api.Function {
+	if c.instance == nil {
+		return nil
+	}
+
+	return c.instance.ExportedFunction(name)
 }
 
 // ImportedFunctions implements Core.
@@ -188,45 +217,55 @@ func (c *core) ImportFunction(module, name string, f any) error {
 		c.importModules[module] = c.runtime.NewHostModuleBuilder(module)
 	}
 
-	c.importModules[module].NewFunctionBuilder().WithFunc(f).Export(name)
+	c.importModules[module].NewFunctionBuilder().WithFunc(f).Export(name).Instantiate(c.ctx)
 
 	// TODO: return an error if the function already exists or the
 	// module/function name is invalid.
 	return nil
 }
 
-// InsertTCPConn implements Core.
-func (c *core) InsertTCPConn(tcpConn *net.TCPConn) (fd int32, err error) {
+// InsertConn implements Core.
+func (c *core) InsertConn(conn net.Conn) (fd int32, err error) {
 	if c.instance == nil {
 		return 0, fmt.Errorf("water: cannot insert TCPConn before instantiation")
 	}
 
-	key, ok := c.instance.InsertTCPConn(tcpConn)
-	if !ok {
-		return 0, fmt.Errorf("water: (*wazero.Module).InsertTCPConn returned false")
+	switch conn := conn.(type) {
+	case *net.TCPConn:
+		key, ok := c.instance.InsertTCPConn(conn)
+		if !ok {
+			return 0, fmt.Errorf("water: (*wazero.Module).InsertTCPConn returned false")
+		}
+		if key <= 0 {
+			return key, fmt.Errorf("water: (*wazero.Module).InsertTCPConn returned invalid key")
+		}
+		return key, nil
+	default:
+		// TODO: support other types of connections as much as possible
+		return 0, fmt.Errorf("water: unsupported connection type: %T", conn)
 	}
-	if key <= 0 {
-		return key, fmt.Errorf("water: (*wazero.Module).InsertTCPConn returned invalid key")
-	}
-
-	return key, nil
 }
 
-// InsertTCPListener implements Core.
-func (c *core) InsertTCPListener(tcpListener *net.TCPListener) (fd int32, err error) {
+// InsertListener implements Core.
+func (c *core) InsertListener(listener net.Listener) (fd int32, err error) {
 	if c.instance == nil {
 		return 0, fmt.Errorf("water: cannot insert TCPListener before instantiation")
 	}
 
-	key, ok := c.instance.InsertTCPListener(tcpListener)
-	if !ok {
-		return 0, fmt.Errorf("water: (*wazero.Module).InsertTCPListener returned false")
+	switch listener := listener.(type) {
+	case *net.TCPListener:
+		key, ok := c.instance.InsertTCPListener(listener)
+		if !ok {
+			return 0, fmt.Errorf("water: (*wazero.Module).InsertTCPListener returned false")
+		}
+		if key <= 0 {
+			return key, fmt.Errorf("water: (*wazero.Module).InsertTCPListener returned invalid key")
+		}
+		return key, nil
+	default:
+		// TODO: support other types of listeners as much as possible
+		return 0, fmt.Errorf("water: unsupported listener type: %T", listener)
 	}
-	if key <= 0 {
-		return key, fmt.Errorf("water: (*wazero.Module).InsertTCPListener returned invalid key")
-	}
-
-	return key, nil
 }
 
 // InsertFile implements Core.
@@ -262,6 +301,25 @@ func (c *core) Instantiate() error {
 	}
 
 	return nil
+}
+
+// Invoke implements Core.
+func (c *core) Invoke(funcName string, params ...uint64) (results []uint64, err error) {
+	if c.instance == nil {
+		return nil, fmt.Errorf("water: cannot invoke function before instantiation")
+	}
+
+	expFunc := c.instance.ExportedFunction(funcName)
+	if expFunc == nil {
+		return nil, fmt.Errorf("water: function %q is not exported", funcName)
+	}
+
+	results, err = expFunc.Call(c.ctx, params...)
+	if err != nil {
+		return nil, fmt.Errorf("water: (*wazero.ExportedFunction).Call returned error: %w", err)
+	}
+
+	return
 }
 
 // WASIPreview1 implements Core.
