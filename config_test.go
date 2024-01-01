@@ -11,15 +11,13 @@ import (
 
 func TestConfigClone(t *testing.T) {
 	c := &water.Config{
-		TMBin:             make([]byte, 256),
-		NetworkDialerFunc: nil, // functions aren't deeply equal unless nil
-		NetworkListener:   &net.TCPListener{},
-		TMConfig: water.TMConfig{
-			FilePath: "/tmp/watm.toml",
-		},
+		TransportModuleBin:    make([]byte, 256),
+		NetworkDialerFunc:     nil, // functions aren't deeply equal unless nil
+		NetworkListener:       &net.TCPListener{},
+		TransportModuleConfig: water.TransportModuleConfigFromBytes([]byte("foo")),
 	}
 
-	_, err := rand.Read(c.TMBin)
+	_, err := rand.Read(c.TransportModuleBin)
 	if err != nil {
 		t.Fatalf("rand.Read error: %v", err)
 	}

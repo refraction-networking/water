@@ -25,7 +25,7 @@ func TestListener(t *testing.T) {
 func testListenerBadAddr(t *testing.T) {
 	// prepare
 	config := &water.Config{
-		TMBin: plain,
+		TransportModuleBin: plain,
 	}
 
 	_, err := config.Listen("tcp", "256.267.278.289:2023")
@@ -41,7 +41,7 @@ func testListenerBadAddr(t *testing.T) {
 func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 	// prepare
 	config := &water.Config{
-		TMBin: plain,
+		TransportModuleBin: plain,
 	}
 
 	testLis, err := config.Listen("tcp", "localhost:0")
@@ -184,7 +184,7 @@ func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 func testListenerReverse(t *testing.T) { // skipcq: GO-R1005
 	// prepare
 	config := &water.Config{
-		TMBin: reverse,
+		TransportModuleBin: reverse,
 	}
 
 	testLis, err := config.Listen("tcp", "localhost:0")
@@ -346,7 +346,7 @@ func BenchmarkInboundListener(b *testing.B) {
 	loadPlain()
 	// prepare
 	config := &water.Config{
-		TMBin: plain,
+		TransportModuleBin: plain,
 	}
 
 	testLis, err := config.Listen("tcp", "localhost:0")
@@ -404,7 +404,7 @@ func BenchmarkInboundListenerReverse(b *testing.B) {
 	loadReverse()
 	// prepare
 	config := &water.Config{
-		TMBin: reverse,
+		TransportModuleBin: reverse,
 	}
 
 	testLis, err := config.Listen("tcp", "localhost:0")

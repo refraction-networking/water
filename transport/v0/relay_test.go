@@ -38,7 +38,7 @@ func testRelayPlain(t *testing.T) { // skipcq: GO-R1005
 
 	// setup relay
 	config := &water.Config{
-		TMBin: plain,
+		TransportModuleBin: plain,
 	}
 	relay, err := water.NewRelay(config)
 	if err != nil {
@@ -184,7 +184,7 @@ func testRelayReverse(t *testing.T) { // skipcq: GO-R1005
 
 	// setup relay
 	config := &water.Config{
-		TMBin: reverse,
+		TransportModuleBin: reverse,
 	}
 	relay, err := water.NewRelay(config)
 	if err != nil {

@@ -25,7 +25,7 @@ func TestDialer(t *testing.T) {
 func testDialerBadAddr(t *testing.T) {
 	// Dial
 	config := &water.Config{
-		TMBin: plain,
+		TransportModuleBin: plain,
 	}
 
 	dialer, err := water.NewDialer(config)
@@ -61,7 +61,7 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 
 	// Dial using water
 	config := &water.Config{
-		TMBin: plain,
+		TransportModuleBin: plain,
 	}
 	dialer, err := water.NewDialer(config)
 	if err != nil {
@@ -206,7 +206,7 @@ func testDialerReverse(t *testing.T) { // skipcq: GO-R1005
 
 	// Dial using water
 	config := &water.Config{
-		TMBin: reverse,
+		TransportModuleBin: reverse,
 	}
 	dialer, err := water.NewDialer(config)
 	if err != nil {
@@ -371,7 +371,7 @@ func BenchmarkDialerOutbound(b *testing.B) {
 
 	// Dial
 	config := &water.Config{
-		TMBin: plain,
+		TransportModuleBin: plain,
 	}
 	dialer, err := water.NewDialer(config)
 	if err != nil {
@@ -434,7 +434,7 @@ func BenchmarkDialerOutboundReverse(b *testing.B) {
 
 	// Dial
 	config := &water.Config{
-		TMBin: reverse,
+		TransportModuleBin: reverse,
 	}
 	dialer, err := water.NewDialer(config)
 	if err != nil {
