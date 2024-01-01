@@ -61,7 +61,7 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 		if reverseCallerConn == nil || callerConn == nil {
 			return nil, fmt.Errorf("water: socket.TCPConnPair returned error: %w", err)
 		} else { // likely due to Close() call errored
-			log.Errorf("water: socket.TCPConnPair returned error: %v", err)
+			log.LErrorf(core.Logger(), "water: socket.TCPConnPair returned error: %v", err)
 		}
 	}
 	conn.callerConn = callerConn
@@ -75,14 +75,14 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 		return nil, err
 	}
 
-	log.Debugf("water: DialV0: conn.tm.Worker() returned")
+	log.LDebugf(core.Logger(), "water: DialV0: conn.tm.Worker() returned")
 
 	// safety: we need to watch for the blocking worker thread's status.
 	// If it returns, no further data can be processed by the WASM module
 	// and we need to close this connection in that case.
 	go func() {
 		<-conn.tm.WorkerErrored()
-		log.Debugf("water: DialV0: worker thread returned")
+		log.LDebugf(core.Logger(), "water: DialV0: worker thread returned")
 		conn.Close()
 	}()
 
@@ -111,7 +111,7 @@ func accept(core water.Core) (c water.Conn, err error) {
 		if reverseCallerConn == nil || callerConn == nil {
 			return nil, fmt.Errorf("water: socket.TCPConnPair returned error: %w", err)
 		} else { // likely due to Close() call errored
-			log.Errorf("water: socket.TCPConnPair returned error: %v", err)
+			log.LErrorf(core.Logger(), "water: socket.TCPConnPair returned error: %v", err)
 		}
 	} else if reverseCallerConn == nil || callerConn == nil {
 		return nil, errors.New("water: socket.TCPConnPair returned nil")
@@ -219,13 +219,13 @@ func (c *Conn) Close() (err error) {
 	}
 
 	c.closeOnce.Do(func() {
-		log.Debugf("Defering TM")
+		log.LDebugf(c.tm.core.Logger(), "Defering TM")
 		c.tm.DeferAll()
-		log.Debugf("Canceling TM")
+		log.LDebugf(c.tm.core.Logger(), "Canceling TM")
 		err = c.tm.Cancel()
-		log.Debugf("Cleaning TM")
+		log.LDebugf(c.tm.core.Logger(), "Cleaning TM")
 		c.tm.Cleanup()
-		log.Debugf("TM canceled")
+		log.LDebugf(c.tm.core.Logger(), "TM canceled")
 	})
 
 	return err

@@ -105,7 +105,7 @@ func UpgradeCore(core water.Core) *TransportModule {
 
 	err := core.WASIPreview1()
 	if err != nil {
-		log.Errorf("water: WASI preview 1 is not supported: %v", err)
+		log.LErrorf(core.Logger(), "water: WASI preview 1 is not supported: %v", err)
 		return nil
 	}
 
@@ -218,14 +218,17 @@ func (tm *TransportModule) Cancel() error {
 	return nil
 }
 
-// Clean up the Transport Module by closing all connections pushed into the Transport Module.
+// Clean up the Transport Module by closing all connections pushed into the Transport Module and
+// shutdown the underlying Core.
 func (tm *TransportModule) Cleanup() {
 	// clean up pushed files
 	var keyList []int32
 	tm.pushedConnMutex.Lock()
 	for k, v := range tm.pushedConn {
 		if v != nil {
-			v.Close()
+			if err := v.Close(); err != nil {
+				log.LErrorf(tm.core.Logger(), "water: closing pushed connection failed: %v", err)
+			}
 		}
 		keyList = append(keyList, k)
 	}
@@ -236,6 +239,10 @@ func (tm *TransportModule) Cleanup() {
 
 	// clean up deferred functions
 	tm.deferredFuncs = nil
+
+	if err := tm.core.Close(); err != nil {
+		log.LErrorf(tm.core.Logger(), "water: closing core failed: %v", err)
+	}
 }
 
 func (tm *TransportModule) Defer(f func()) {
@@ -345,10 +352,12 @@ func (tm *TransportModule) Initialize() error {
 	}
 
 	// import pull_config function (it is called pushConfig here in the host)
-	if err := tm.core.ImportFunction("env", "pull_config", tm.pushConfig); err != nil {
+	// if tm.core.ImportedFunctions()["env"]["pull_config"] != nil {
+	if err = tm.core.ImportFunction("env", "pull_config", tm.pushConfig); err != nil {
 		return fmt.Errorf("water: (*water.Core).ImportFunction returned error "+
 			"when importing pull_config function: %w", err)
 	}
+	// }
 
 	// instantiate the WASM module
 	if err = tm.core.Instantiate(); err != nil {
@@ -575,7 +584,7 @@ func (tm *TransportModule) Worker() error {
 		return fmt.Errorf("water: _water_cancel_with returned error: %w", wasm.WASMErr(ret))
 	}
 
-	log.Debugf("water: starting worker thread")
+	log.LDebugf(tm.core.Logger(), "water: starting worker thread")
 
 	// in a goroutine, call _worker
 	go func() {
@@ -595,20 +604,20 @@ func (tm *TransportModule) Worker() error {
 			tm.backgroundWorker.chanWorkerErr <- wasm.WASMErr(ret)
 			tm.backgroundWorker.chanWorkerErr <- wasm.WASMErr(ret)
 			tm.backgroundWorker.chanWorkerErr <- wasm.WASMErr(ret)
-			log.Warnf("water: worker thread exited with code %d", ret)
+			log.LWarnf(tm.core.Logger(), "water: worker thread exited with code %d", ret)
 		} else {
-			log.Debugf("water: worker thread exited with code 0")
+			log.LDebugf(tm.core.Logger(), "water: worker thread exited with code 0")
 		}
 	}()
 
-	log.Debugf("water: worker thread started")
+	log.LDebugf(tm.core.Logger(), "water: worker thread started")
 
 	// last sanity check if the worker thread crashed immediately even before we return
 	select {
 	case err := <-tm.backgroundWorker.chanWorkerErr: // if already returned, basically it failed to start
 		return fmt.Errorf("water: worker thread returned error: %w", err)
 	default:
-		log.Debugf("water: Worker (func, not the worker thread) returning")
+		log.LDebugf(tm.core.Logger(), "water: Worker (func, not the worker thread) returning")
 		return nil
 	}
 }
@@ -621,20 +630,25 @@ func (tm *TransportModule) WorkerErrored() <-chan error {
 	return tm.backgroundWorker.chanWorkerErr
 }
 
-func (tm *TransportModule) pushConfig() (int32, error) {
+func (tm *TransportModule) pushConfig() int32 {
 	// get config file
-	configFile := tm.core.Config().TMConfig.File()
-	if configFile == nil {
-		return wasm.INVALID_FD, nil // we don't return error here so no trap is triggered
+	if tm.core.Config().TransportModuleConfig == nil {
+		return wasm.NOT_INITIALIZED // Not necessarily a fatal error -- it could be optional to a TransportModule
 	}
 
-	// push file to WASM
+	configFile, err := tm.core.Config().TransportModuleConfig.AsFile()
+	if err == nil {
+		return wasm.INVALID_CONFIG // This is considered a fatal error, as the config file is supplied but cannot be loaded.
+	}
+
+	// push config file into WebAssembly instance
 	configFd, err := tm.core.InsertFile(configFile)
 	if err != nil {
-		return wasm.INVALID_FD, err
+		log.LErrorf(tm.core.Logger(), "water: pushing config file failed: %v", err)
+		return wasm.INVALID_FD
 	}
 
-	return int32(configFd), nil
+	return int32(configFd)
 }
 
 // PushConn pushes a net.Conn into the Transport Module.

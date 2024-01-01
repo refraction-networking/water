@@ -1,4 +1,4 @@
-github.com/gaukas/wazero v1.5.0-w h1:S42NpBmMqqbLgSg+JbH4YepR3kl6Wv/FMVmpuJ5XOcY=
-github.com/gaukas/wazero v1.5.0-w/go.mod h1:0U0G41+ochRKoPKCJlh0jMg1CHkyfK8kDqiirMmKY8A=
-golang.org/x/exp v0.0.0-20230905200255-921286631fa9 h1:GoHiUyI/Tp2nVkLI2mCxVkOjsbSXD66ic0XW0js0R9g=
-golang.org/x/exp v0.0.0-20230905200255-921286631fa9/go.mod h1:S2oDrQGGwySpoQPVqRShND87VCbxmc6bL1Yd2oYrm6k=
+github.com/gaukas/wazero v1.6.0-w h1:p/BaOcF825jQsvrHJq53SQ5c7PZVko5957xCfO/zm7A=
+github.com/gaukas/wazero v1.6.0-w/go.mod h1:0U0G41+ochRKoPKCJlh0jMg1CHkyfK8kDqiirMmKY8A=
+golang.org/x/exp v0.0.0-20231226003508-02704c960a9b h1:kLiC65FbiHWFAOu+lxwNPujcsl8VYyTYYEZnsOO1WK4=
+golang.org/x/exp v0.0.0-20231226003508-02704c960a9b/go.mod h1:iRJReGqOEeBhDZGkGbynYwcHlctCvnjTYIamk7uXpHI=

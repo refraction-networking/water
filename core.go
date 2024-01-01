@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/gaukas/water/internal/log"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -25,6 +26,10 @@ type Core interface {
 
 	// Context returns the base context used by the Core.
 	Context() context.Context
+
+	// Close closes the Core and releases all the resources
+	// associated with it.
+	Close() error
 
 	// Exports dumps all the exported functions and globals which
 	// are provided by the WebAssembly module.
@@ -101,7 +106,12 @@ type Core interface {
 	// It is recommended that this function only to be invoked if
 	// the WATM expects the WASI preview1 API to be available.
 	WASIPreview1() error
+
+	Logger() *log.Logger
 }
+
+// type guard
+var _ Core = (*core)(nil)
 
 // core provides the WASM runtime base and is an internal struct
 // that every RuntimeXxx implementation will embed.
@@ -170,6 +180,23 @@ func (c *core) Context() context.Context {
 	return c.ctx
 }
 
+// Close implements Core.
+func (c *core) Close() error {
+	if c.instance != nil {
+		if err := c.instance.Close(c.ctx); err != nil {
+			return fmt.Errorf("water: (*wazero/api.Module).Close returned error: %w", err)
+		}
+	}
+
+	if c.runtime != nil {
+		if err := c.runtime.Close(c.ctx); err != nil {
+			return fmt.Errorf("water: (*wazero.Runtime).Close returned error: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // Exports implements Core.
 func (c *core) Exports() map[string]api.ExternType {
 	c.exportsLoadOnce.Do(func() {
@@ -194,13 +221,16 @@ func (c *core) ImportedFunctions() map[string]map[string]api.FunctionDefinition 
 		importedFuncs := c.module.ImportedFunctions()
 
 		c.importedFuncs = make(map[string]map[string]api.FunctionDefinition)
-
 		for _, importedFunc := range importedFuncs {
-			if _, ok := c.importedFuncs[importedFunc.ModuleName()]; !ok {
-				c.importedFuncs[importedFunc.ModuleName()] = make(map[string]api.FunctionDefinition)
+			mod, name, ok := importedFunc.Import()
+			if !ok {
+				continue
 			}
 
-			c.importedFuncs[importedFunc.ModuleName()][importedFunc.Name()] = importedFunc
+			if _, ok := c.importedFuncs[mod]; !ok {
+				c.importedFuncs[mod] = make(map[string]api.FunctionDefinition)
+			}
+			c.importedFuncs[mod][name] = importedFunc
 		}
 	})
 
@@ -213,76 +243,39 @@ func (c *core) ImportFunction(module, name string, f any) error {
 		return fmt.Errorf("water: cannot import function after instantiation")
 	}
 
+	// Unsafe: check if the WebAssembly module really imports this function under
+	// the given module and name. If not, we warn and skip the import.
+	if mod, ok := c.ImportedFunctions()[module]; !ok {
+		log.LWarnf(c.config.Logger(), "water: module %s is not imported, skipping...", module)
+
+		// list all the imported modules
+		for mod := range c.ImportedFunctions() {
+			log.LWarnf(c.config.Logger(), "water: module %s is imported", mod)
+		}
+
+		return nil
+	} else if _, ok := mod[name]; !ok {
+		log.LWarnf(c.config.Logger(), "water: function %s.%s is not imported, skipping...", module, name)
+		return nil
+	}
+
 	if _, ok := c.importModules[module]; !ok {
 		c.importModules[module] = c.runtime.NewHostModuleBuilder(module)
 	}
 
-	c.importModules[module].NewFunctionBuilder().WithFunc(f).Export(name).Instantiate(c.ctx)
+	// We don't do this:
+	//
+	//  _, err := c.importModules[module].NewFunctionBuilder().WithFunc(f).Export(name).Instantiate(c.ctx)
+	//  if err != nil {
+	// 		log.LErrorf(c.config.Logger(), "water: (*wazero.HostModuleBuilder).NewFunctionBuilder returned error: %v", err)
+	//  }
+	//
+	// Instead we do not instantiate the function here, but wait until Instantiate() is called.
+	c.importModules[module] = c.importModules[module].NewFunctionBuilder().WithFunc(f).Export(name)
 
 	// TODO: return an error if the function already exists or the
 	// module/function name is invalid.
 	return nil
-}
-
-// InsertConn implements Core.
-func (c *core) InsertConn(conn net.Conn) (fd int32, err error) {
-	if c.instance == nil {
-		return 0, fmt.Errorf("water: cannot insert TCPConn before instantiation")
-	}
-
-	switch conn := conn.(type) {
-	case *net.TCPConn:
-		key, ok := c.instance.InsertTCPConn(conn)
-		if !ok {
-			return 0, fmt.Errorf("water: (*wazero.Module).InsertTCPConn returned false")
-		}
-		if key <= 0 {
-			return key, fmt.Errorf("water: (*wazero.Module).InsertTCPConn returned invalid key")
-		}
-		return key, nil
-	default:
-		// TODO: support other types of connections as much as possible
-		return 0, fmt.Errorf("water: unsupported connection type: %T", conn)
-	}
-}
-
-// InsertListener implements Core.
-func (c *core) InsertListener(listener net.Listener) (fd int32, err error) {
-	if c.instance == nil {
-		return 0, fmt.Errorf("water: cannot insert TCPListener before instantiation")
-	}
-
-	switch listener := listener.(type) {
-	case *net.TCPListener:
-		key, ok := c.instance.InsertTCPListener(listener)
-		if !ok {
-			return 0, fmt.Errorf("water: (*wazero.Module).InsertTCPListener returned false")
-		}
-		if key <= 0 {
-			return key, fmt.Errorf("water: (*wazero.Module).InsertTCPListener returned invalid key")
-		}
-		return key, nil
-	default:
-		// TODO: support other types of listeners as much as possible
-		return 0, fmt.Errorf("water: unsupported listener type: %T", listener)
-	}
-}
-
-// InsertFile implements Core.
-func (c *core) InsertFile(osFile *os.File) (fd int32, err error) {
-	if c.instance == nil {
-		return 0, fmt.Errorf("water: cannot insert File before instantiation")
-	}
-
-	key, ok := c.instance.InsertOSFile(osFile)
-	if !ok {
-		return 0, fmt.Errorf("water: (*wazero.Module).InsertFile returned false")
-	}
-	if key <= 0 {
-		return key, fmt.Errorf("water: (*wazero.Module).InsertFile returned invalid key")
-	}
-
-	return key, nil
 }
 
 // Instantiate implements Core.
@@ -294,6 +287,13 @@ func (c *core) Instantiate() error {
 	moduleConfig, err := c.config.ModuleConfigFactory.GetConfig()
 	if err != nil {
 		return fmt.Errorf("water: (*RuntimeConfigFactory).GetConfig returned error: %w", err)
+	}
+
+	// Instantiate the imported functions
+	for _, moduleBuilder := range c.importModules {
+		if _, err := moduleBuilder.Instantiate(c.ctx); err != nil {
+			return fmt.Errorf("water: (*wazero.HostModuleBuilder).Instantiate returned error: %w", err)
+		}
 	}
 
 	if c.instance, err = c.runtime.InstantiateModule(c.ctx, c.module, moduleConfig); err != nil {
@@ -330,5 +330,7 @@ func (c *core) WASIPreview1() error {
 	return nil
 }
 
-// type guard
-var _ Core = (*core)(nil)
+// Logger implements Core.
+func (c *core) Logger() *log.Logger {
+	return c.config.Logger()
+}
