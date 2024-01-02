@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"syscall"
-
-	"github.com/gaukas/water/internal/log"
 )
 
 // InsertConn implements Core.
@@ -17,11 +14,6 @@ func (c *core) InsertConn(conn net.Conn) (fd int32, err error) {
 
 	switch conn := conn.(type) {
 	case *net.TCPConn:
-		// make it non-blocking
-		if err := setNonblock(conn); err != nil {
-			return 0, fmt.Errorf("water: error setting non-blocking mode: %w", err)
-		}
-
 		key, ok := c.instance.InsertTCPConn(conn)
 		if !ok {
 			return 0, fmt.Errorf("water: (*wazero.Module).InsertTCPConn returned false")
@@ -44,11 +36,6 @@ func (c *core) InsertListener(listener net.Listener) (fd int32, err error) {
 
 	switch listener := listener.(type) {
 	case *net.TCPListener:
-		// make it non-blocking
-		if err := setNonblock(listener); err != nil {
-			return 0, fmt.Errorf("water: error setting non-blocking mode: %w", err)
-		}
-
 		key, ok := c.instance.InsertTCPListener(listener)
 		if !ok {
 			return 0, fmt.Errorf("water: (*wazero.Module).InsertTCPListener returned false")
@@ -69,11 +56,6 @@ func (c *core) InsertFile(osFile *os.File) (fd int32, err error) {
 		return 0, fmt.Errorf("water: cannot insert File before instantiation")
 	}
 
-	// make it non-blocking
-	if err := setNonblock(osFile); err != nil {
-		return 0, fmt.Errorf("water: error setting non-blocking mode: %w", err)
-	}
-
 	key, ok := c.instance.InsertOSFile(osFile)
 	if !ok {
 		return 0, fmt.Errorf("water: (*wazero.Module).InsertFile returned false")
@@ -83,17 +65,4 @@ func (c *core) InsertFile(osFile *os.File) (fd int32, err error) {
 	}
 
 	return key, nil
-}
-
-func setNonblock(conn syscall.Conn) error {
-	rawConn, err := conn.SyscallConn()
-	if err != nil {
-		return err
-	}
-
-	return rawConn.Control(func(fd uintptr) {
-		if err := syscall.SetNonblock(platformSpecificFd(fd), true); err != nil {
-			log.Errorf("failed to set non-blocking: %v", err)
-		}
-	})
 }
