@@ -3,7 +3,9 @@ package v0_test
 import (
 	"bytes"
 	"crypto/rand"
+	"fmt"
 	"net"
+	"os"
 	"runtime"
 	"sync"
 	"testing"
@@ -13,6 +15,97 @@ import (
 	v0 "github.com/gaukas/water/transport/v0"
 )
 
+// ExampleListener demonstrates how to use v0.Listener as a water.Listener.
+func ExampleListener() {
+	// reverse.wasm reverses the message on read/write, bidirectionally.
+	wasm, err := os.ReadFile("../../testdata/v0/reverse.wasm")
+	if err != nil {
+		panic(fmt.Sprintf("failed to read wasm file: %v", err))
+	}
+
+	wrappedTcpListener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		panic(fmt.Sprintf("failed to listen: %v", err))
+	}
+
+	// start using W.A.T.E.R. API below this line, have fun!
+	config := &water.Config{
+		TransportModuleBin: wasm,
+		NetworkListener:    wrappedTcpListener,
+	}
+
+	waterListener, err := v0.NewListener(config)
+	if err != nil {
+		panic(fmt.Sprintf("failed to listen: %v", err))
+	}
+	defer waterListener.Close()
+
+	// start a goroutine to dial local TCP connections
+	go func() {
+		tcpConn, err := net.Dial("tcp", waterListener.Addr().String())
+		if err != nil {
+			panic(fmt.Sprintf("failed to dial: %v", err))
+		}
+
+		// start a goroutine to handle the connection
+		go func(tcpConn net.Conn) {
+			// echo everything back
+			defer tcpConn.Close()
+			buf := make([]byte, 1024)
+			for {
+				n, err := tcpConn.Read(buf)
+				if err != nil {
+					return
+				}
+
+				if string(buf[:n]) != "olleh" {
+					panic(fmt.Sprintf("unexpected message: %s", string(buf[:n])))
+				}
+
+				_, err = tcpConn.Write([]byte("hello"))
+				if err != nil {
+					return
+				}
+			}
+		}(tcpConn)
+	}()
+
+	waterConn, err := waterListener.Accept()
+	if err != nil {
+		panic(fmt.Sprintf("failed to accept: %v", err))
+	}
+	defer waterConn.Close()
+
+	var msg = []byte("hello")
+	n, err := waterConn.Write(msg)
+	if err != nil {
+		panic(fmt.Sprintf("failed to write: %v", err))
+	}
+	if n != len(msg) {
+		panic(fmt.Sprintf("failed to write: %v", err))
+	}
+
+	buf := make([]byte, 1024)
+	n, err = waterConn.Read(buf)
+	if err != nil {
+		panic(fmt.Sprintf("failed to read: %v", err))
+	}
+	if n != len(msg) {
+		panic(fmt.Sprintf("failed to read: %v", err))
+	}
+
+	fmt.Println(string(buf[:n]))
+	// Output: olleh
+}
+
+// TestListener covers the following cases:
+//  1. Listener must work with a plain WebAssembly Transport Module that
+//     doesn't transform the message.
+//  2. Listener must work with a WebAssembly Transport Module that
+//     transforms the message by reversing it.
+//  3. Listener must fail when an invalid address is supplied.
+//  4. Listener must fail when a WebAssembly Transport Module does not
+//     fully implement the v0 listener spec.
 func TestListener(t *testing.T) {
 	loadPlain()
 	loadReverse()

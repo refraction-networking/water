@@ -3,15 +3,99 @@ package v0_test
 import (
 	"bytes"
 	"crypto/rand"
+	"fmt"
 	"net"
+	"os"
 	"runtime"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/gaukas/water"
+	v0 "github.com/gaukas/water/transport/v0"
 )
 
+// ExampleRelay demonstrates how to use v0.Relay as a water.Relay.
+func ExampleRelay() {
+	// Relay destination: a local TCP server
+	tcpListener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		panic(fmt.Sprintf("failed to listen: %v", err))
+	}
+
+	// use a goroutine to accept incoming connections
+	var serverConn net.Conn
+	var serverAcceptErr error
+	var serverAcceptWg *sync.WaitGroup = new(sync.WaitGroup)
+	serverAcceptWg.Add(1)
+	go func() {
+		serverConn, serverAcceptErr = tcpListener.Accept()
+		serverAcceptWg.Done()
+	}()
+
+	// reverse.wasm reverses the message on read/write, bidirectionally.
+	wasm, err := os.ReadFile("../../testdata/v0/reverse.wasm")
+	if err != nil {
+		panic(fmt.Sprintf("failed to read wasm file: %v", err))
+	}
+
+	config := &water.Config{
+		TransportModuleBin: wasm,
+	}
+
+	waterRelay, err := v0.NewRelay(config)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create relay: %v", err))
+	}
+	defer waterRelay.Close()
+
+	// in a goroutine, start relay
+	go func() {
+		waterRelay.ListenAndRelayTo("tcp", ":0", "tcp", tcpListener.Addr().String())
+	}()
+	time.Sleep(100 * time.Millisecond) // 100ms to spin up relay
+
+	// test source: a local TCP client
+	clientConn, err := net.Dial("tcp", waterRelay.Addr().String())
+	if err != nil {
+		panic(fmt.Sprintf("failed to dial: %v", err))
+	}
+	defer clientConn.Close() // skipcq: GO-S2307
+
+	// wait for server to accept connection
+	serverAcceptWg.Wait()
+	if serverAcceptErr != nil {
+		panic(fmt.Sprintf("failed to accept: %v", err))
+	}
+	defer serverConn.Close() // skipcq: GO-S2307
+
+	var msg = []byte("hello")
+	n, err := clientConn.Write(msg)
+	if err != nil {
+		panic(fmt.Sprintf("failed to write: %v", err))
+	}
+	if n != len(msg) {
+		panic(fmt.Sprintf("failed to write: %v", err))
+	}
+
+	buf := make([]byte, 1024)
+	n, err = serverConn.Read(buf)
+	if err != nil {
+		panic(fmt.Sprintf("failed to read: %v", err))
+	}
+	if n != len(msg) {
+		panic(fmt.Sprintf("failed to read: %v", err))
+	}
+
+	fmt.Println(string(buf[:n]))
+	// Output: olleh
+}
+
+// TestRelay covers the following cases:
+//  1. Relay must work with a plain WebAssembly Transport Module that
+//     doesn't transform the message.
+//  2. Relay must work with a WebAssembly Transport Module that
+//     transforms the message by reversing it.
 func TestRelay(t *testing.T) {
 	loadPlain()
 	loadReverse()

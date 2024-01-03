@@ -3,7 +3,9 @@ package v0_test
 import (
 	"bytes"
 	"crypto/rand"
+	"fmt"
 	"net"
+	"os"
 	"runtime"
 	"sync"
 	"testing"
@@ -13,6 +15,96 @@ import (
 	v0 "github.com/gaukas/water/transport/v0"
 )
 
+// ExampleDialer demonstrates how to use v0.Dialer as a water.Dialer.
+func ExampleDialer() {
+	// reverse.wasm reverses the message on read/write, bidirectionally.
+	wasm, err := os.ReadFile("../../testdata/v0/reverse.wasm")
+	if err != nil {
+		panic(fmt.Sprintf("failed to read wasm file: %v", err))
+	}
+
+	config := &water.Config{
+		TransportModuleBin: wasm,
+	}
+
+	waterDialer, err := v0.NewDialer(config)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create dialer: %v", err))
+	}
+
+	// create a local TCP listener
+	tcpListener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		panic(fmt.Sprintf("failed to listen: %v", err))
+	}
+	defer tcpListener.Close()
+
+	// start a goroutine to accept connections from the local TCP listener
+	go func() {
+		tcpConn, err := tcpListener.Accept()
+		if err != nil {
+			panic(fmt.Sprintf("failed to accept: %v", err))
+		}
+
+		// start a goroutine to handle the connection
+		go func(tcpConn net.Conn) {
+			// echo everything back
+			defer tcpConn.Close()
+			buf := make([]byte, 1024)
+			for {
+				n, err := tcpConn.Read(buf)
+				if err != nil {
+					return
+				}
+
+				if string(buf[:n]) != "olleh" {
+					panic(fmt.Sprintf("unexpected message: %s", string(buf[:n])))
+				}
+
+				_, err = tcpConn.Write([]byte("hello"))
+				if err != nil {
+					return
+				}
+			}
+		}(tcpConn)
+	}()
+
+	waterConn, err := waterDialer.Dial("tcp", tcpListener.Addr().String())
+	if err != nil {
+		panic(fmt.Sprintf("failed to dial: %v", err))
+	}
+	defer waterConn.Close()
+
+	var msg = []byte("hello")
+	n, err := waterConn.Write(msg)
+	if err != nil {
+		panic(fmt.Sprintf("failed to write: %v", err))
+	}
+	if n != len(msg) {
+		panic(fmt.Sprintf("failed to write: %v", err))
+	}
+
+	buf := make([]byte, 1024)
+	n, err = waterConn.Read(buf)
+	if err != nil {
+		panic(fmt.Sprintf("failed to read: %v", err))
+	}
+	if n != len(msg) {
+		panic(fmt.Sprintf("failed to read: %v", err))
+	}
+
+	fmt.Println(string(buf[:n]))
+	// Output: olleh
+}
+
+// TestDialer covers the following cases:
+//  1. Dialer must work with a plain WebAssembly Transport Module that
+//     doesn't transform the message.
+//  2. Dialer must work with a WebAssembly Transport Module that
+//     transforms the message by reversing it.
+//  3. Dialer must fail when an invalid address is supplied.
+//  4. Dialer must fail when a WebAssembly Transport Module does not
+//     fully implement the v0 dialer spec.
 func TestDialer(t *testing.T) {
 	loadPlain()
 	loadReverse()
