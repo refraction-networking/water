@@ -101,8 +101,8 @@ func NewListener(c *Config) (Listener, error) {
 	//
 	// TODO: detect the version of the WebAssembly Transport Module
 	// in a more organized way.
-	for _, export := range core.Module().Exports() {
-		if f, ok := knownListenerVersions[export.Name()]; ok {
+	for exportName := range core.Exports() {
+		if f, ok := knownListenerVersions[exportName]; ok {
 			return f(c)
 		}
 	}

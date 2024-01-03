@@ -1,107 +1,18 @@
 package socket
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/gaukas/water/internal/log"
 )
 
-// UnixConnWrap wraps an io.Reader/io.Writer/io.ReadWriteCloser
-// interface into a UnixConn.
-//
-// This function spins up either one or two goroutines to copy
-// data between the ReadWriteCloser and the UnixConn. Anything
-// written to the UnixConn by caller will be written to the
-// wrapped object if the object implements io.Writer, and if
-// the object implements io.Reader, anything read by goroutine
-// from the wrapped object will be readable from the UnixConn
-// by caller.
-//
-// Once this function is invoked, the caller should not perform I/O
-// operations on the ReadWriteCloser anymore.
-func UnixConnWrap(obj any) (*net.UnixConn, error) {
-	// get a pair of connected UnixConn
-	unixConn, reverseUnixConn, err := UnixConnPair()
-	if err != nil && (unixConn == nil || reverseUnixConn == nil) {
-		return nil, err
-	}
-
-	// if the object implements io.Reader: read from the object and write to the reverseUnixConn
-	if reader, ok := obj.(io.Reader); ok {
-		go func() {
-			_, _ = io.Copy(reverseUnixConn, reader)
-
-			// when the src is closed, we will close the dst
-			time.Sleep(1 * time.Millisecond)
-			log.Debugf("closing reverseUnixConn and unixConn")
-			err = reverseUnixConn.Close()
-			err = unixConn.Close()
-		}()
-	}
-
-	// if the object implements io.Writer: read from the reverseUnixConn and write to the object
-	if writer, ok := obj.(io.Writer); ok {
-		go func() {
-			_, _ = io.Copy(writer, reverseUnixConn)
-			// when the src is closed, we will close the dst
-			if closer, ok := obj.(io.Closer); ok {
-				time.Sleep(1 * time.Millisecond)
-				log.Debugf("closing obj")
-				_ = closer.Close()
-			}
-		}()
-	}
-
-	return unixConn, nil
-}
-
-func UnixConnFileWrap(obj any) (*os.File, error) {
-	// get a pair of connected UnixConn
-	unixConn, reverseUnixConn, err := UnixConnPair()
-	if err != nil && (unixConn == nil || reverseUnixConn == nil) {
-		return nil, err
-	}
-
-	unixConnFile, err := unixConn.File()
-	if err != nil {
-		return nil, err
-	}
-
-	// if the object implements io.Reader: read from the object and write to the reverseUnixConn
-	if reader, ok := obj.(io.Reader); ok {
-		go func() {
-			_, _ = io.Copy(reverseUnixConn, reader)
-			// when the src is closed, we will close the dst
-			time.Sleep(1 * time.Millisecond)
-			log.Debugf("closing reverseUnixConn and unixConn")
-			reverseUnixConn.Close()
-			_ = unixConn.Close()
-			_ = unixConnFile.Close()
-		}()
-	}
-
-	// if the object implements io.Writer: read from the reverseUnixConn and write to the object
-	if writer, ok := obj.(io.Writer); ok {
-		go func() {
-			_, _ = io.Copy(writer, reverseUnixConn)
-			// when the src is closed, we will close the dst
-			if closer, ok := obj.(io.Closer); ok {
-				time.Sleep(1 * time.Millisecond)
-				log.Debugf("closing obj")
-				_ = closer.Close()
-			}
-		}()
-	}
-
-	return unixConnFile, nil
-}
-
+// UnixConnPair returns a pair of connected net.UnixConn.
 func UnixConnPair(path ...string) (*net.UnixConn, *net.UnixConn, error) {
 	var c1, c2 net.Conn
 
@@ -156,4 +67,129 @@ func UnixConnPair(path ...string) (*net.UnixConn, *net.UnixConn, error) {
 	} else {
 		return nil, nil, fmt.Errorf("c1 is not *net.UnixConn")
 	}
+}
+
+// UnixConnWrap wraps an io.Reader/io.Writer/io.Closer
+// interface into a UnixConn.
+//
+// This function spins up goroutine(s) to copy data between the
+// ReadWrite(Close)r and the UnixConn. Anything written to the
+// UnixConn by caller will be written to the wrapped object if
+// the object implements io.Writer, and if the object implements
+// io.Reader, anything read by goroutine from the wrapped object
+// will be readable from the UnixConn by caller.
+//
+// Once this function is invoked, the caller should not perform I/O
+// operations on the wrapped connection anymore.
+//
+// The returned context.Context can be used to check if the connection
+// is still alive. If the connection is closed, the context will be
+// canceled.
+func UnixConnWrap(wrapped any) (wrapperConn *net.UnixConn, ctxCancel context.Context, err error) {
+	// get a pair of connected UnixConn
+	unixConn, reverseUnixConn, err := UnixConnPair()
+	if err != nil && (unixConn == nil || reverseUnixConn == nil) {
+		return nil, nil, err
+	}
+
+	var cancel context.CancelFunc
+	ctxCancel, cancel = context.WithCancel(context.Background())
+
+	reader, readerOk := wrapped.(io.Reader)
+	writer, writerOk := wrapped.(io.Writer)
+	var wg *sync.WaitGroup = new(sync.WaitGroup)
+	if !readerOk && !writerOk {
+		cancel()
+		return nil, nil, fmt.Errorf("wrapped does not implement io.Reader nor io.Writer")
+	} else if readerOk && !writerOk {
+		// only reader is implemented
+		log.Debugf("wrapped does not implement io.Writer, skipping copy from wrapped to wrapper")
+
+		wg.Add(1)
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
+			_, _ = io.Copy(reverseUnixConn, reader) // unsafe: error is ignored
+			_ = reverseUnixConn.Close()             // unsafe: error is ignored
+			_ = unixConn.Close()                    // unsafe: error is ignored
+		}(wg)
+	} else if !readerOk && writerOk {
+		// only writer is implemented
+		log.Debugf("wrapped does not implement io.Reader, skipping copy from wrapper to wrapped")
+
+		wg.Add(1)
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
+			_, _ = io.Copy(writer, reverseUnixConn) // unsafe: error is ignored
+			// when the src is closed, we will close the dst (if implements io.Closer)
+			if closer, ok := wrapped.(io.Closer); ok {
+				_ = closer.Close() // unsafe: error is ignored
+			}
+		}(wg)
+	} else {
+		// both reader and writer are implemented
+		wg.Add(2)
+
+		// copy from wrapped to wrapper
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
+			_, _ = io.Copy(reverseUnixConn, reader) // unsafe: error is ignored
+			_ = reverseUnixConn.Close()             // unsafe: error is ignored
+			_ = unixConn.Close()                    // unsafe: error is ignored
+		}(wg)
+
+		// copy from wrapper to wrapped
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
+			_, _ = io.Copy(writer, reverseUnixConn) // unsafe: error is ignored
+			// when the src is closed, we will close the dst (if implements io.Closer)
+			if closer, ok := wrapped.(io.Closer); ok {
+				_ = closer.Close() // unsafe: error is ignored
+			}
+		}(wg)
+	}
+
+	// spawn a goroutine to wait for all copying to finish
+	go func(wg *sync.WaitGroup) {
+		wg.Wait()
+		cancel()
+
+		// close again to make sure we don't forget to close anything
+		// if io.Reader or io.Writer is not implemented.
+
+		// close the reverseTCPConn
+		_ = reverseUnixConn.Close() // unsafe: error is ignored
+
+		// close the tcpConn
+		_ = unixConn.Close() // unsafe: error is ignored
+
+		// close the wrapped
+		if closer, ok := wrapped.(io.Closer); ok {
+			_ = closer.Close() // unsafe: error is ignored
+		}
+	}(wg)
+
+	return unixConn, ctxCancel, nil
+}
+
+// UnixConnFileWrap wraps an object into a *os.File from an
+// underlying net.UnixConn. The object must implement io.Reader
+// and/or io.Writer.
+//
+// If the object implements io.Reader, upon completing copying
+// the object to the returned *os.File, the callback functions
+// will be called.
+//
+// It is caller's responsibility to close the returned *os.File.
+func UnixConnFileWrap(wrapped any) (wrapperFile *os.File, ctxCancel context.Context, err error) {
+	unixWrapperConn, ctxCancel, err := UnixConnWrap(wrapped)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	unixWrapperFile, err := unixWrapperConn.File()
+	if err != nil {
+		return nil, nil, fmt.Errorf("(*net.UnixConn).File returned error: %w", err)
+	}
+
+	return unixWrapperFile, ctxCancel, nil
 }

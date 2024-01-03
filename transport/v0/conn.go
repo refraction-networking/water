@@ -12,14 +12,13 @@ import (
 	"github.com/gaukas/water"
 	"github.com/gaukas/water/internal/log"
 	"github.com/gaukas/water/internal/socket"
-	v0 "github.com/gaukas/water/internal/v0"
 )
 
 // Conn is the first experimental version of Conn implementation.
 type Conn struct {
 	// callerConn is used by DialV0() and AcceptV0(). It is used to talk to
 	// the caller of water API by allowing the caller to Read() and Write() to it.
-	callerConn net.Conn // the connection from the caller, usually a *net.UnixConn
+	callerConn net.Conn // the connection from the caller, usually a *net.TCPConnPair
 
 	// srcConn is used by AcceptV0() and RelayV0(). It is used
 	// to talk to a remote source by accepting a connection from it.
@@ -29,7 +28,7 @@ type Conn struct {
 	// to talk to a remote destination by actively dialing to it.
 	dstConn net.Conn // the connection to the remote destination, usually a *net.TCPConn
 
-	tm *v0.TransportModule
+	tm *TransportModule
 
 	closeOnce *sync.Once
 	closed    atomic.Bool
@@ -40,13 +39,13 @@ type Conn struct {
 // dial dials the network address using through the WASM module
 // while using the dialerFunc specified in core.config.
 func dial(core water.Core, network, address string) (c water.Conn, err error) {
-	tm := v0.Core2TransportModule(core)
+	tm := UpgradeCore(core)
 	conn := &Conn{
 		tm:        tm,
 		closeOnce: &sync.Once{},
 	}
 
-	dialer := v0.NewManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
+	dialer := NewManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
 
 	if err = conn.tm.LinkNetworkInterface(dialer, nil); err != nil {
 		return nil, err
@@ -56,13 +55,13 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 		return nil, err
 	}
 
-	reverseCallerConn, callerConn, err := socket.UnixConnPair()
+	reverseCallerConn, callerConn, err := socket.TCPConnPair()
 	// wasmCallerConn, conn.uoConn, err = socket.TCPConnPair()
 	if err != nil {
 		if reverseCallerConn == nil || callerConn == nil {
-			return nil, fmt.Errorf("water: socket.UnixConnPair returned error: %w", err)
+			return nil, fmt.Errorf("water: socket.TCPConnPair returned error: %w", err)
 		} else { // likely due to Close() call errored
-			log.Errorf("water: socket.UnixConnPair returned error: %v", err)
+			log.LErrorf(core.Logger(), "water: socket.TCPConnPair returned error: %v", err)
 		}
 	}
 	conn.callerConn = callerConn
@@ -76,14 +75,14 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 		return nil, err
 	}
 
-	log.Debugf("water: DialV0: conn.tm.Worker() returned")
+	log.LDebugf(core.Logger(), "water: DialV0: conn.tm.Worker() returned")
 
 	// safety: we need to watch for the blocking worker thread's status.
 	// If it returns, no further data can be processed by the WASM module
 	// and we need to close this connection in that case.
 	go func() {
 		<-conn.tm.WorkerErrored()
-		log.Debugf("water: DialV0: worker thread returned")
+		log.LDebugf(core.Logger(), "water: DialV0: worker thread returned")
 		conn.Close()
 	}()
 
@@ -93,7 +92,7 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 // accept accepts the network connection using through the WASM module
 // while using the net.Listener specified in core.config.
 func accept(core water.Core) (c water.Conn, err error) {
-	tm := v0.Core2TransportModule(core)
+	tm := UpgradeCore(core)
 	conn := &Conn{
 		tm:        tm,
 		closeOnce: &sync.Once{},
@@ -107,15 +106,15 @@ func accept(core water.Core) (c water.Conn, err error) {
 		return nil, err
 	}
 
-	reverseCallerConn, callerConn, err := socket.UnixConnPair()
+	reverseCallerConn, callerConn, err := socket.TCPConnPair()
 	if err != nil {
 		if reverseCallerConn == nil || callerConn == nil {
-			return nil, fmt.Errorf("water: socket.UnixConnPair returned error: %w", err)
+			return nil, fmt.Errorf("water: socket.TCPConnPair returned error: %w", err)
 		} else { // likely due to Close() call errored
-			log.Errorf("water: socket.UnixConnPair returned error: %v", err)
+			log.LErrorf(core.Logger(), "water: socket.TCPConnPair returned error: %v", err)
 		}
 	} else if reverseCallerConn == nil || callerConn == nil {
-		return nil, errors.New("water: socket.UnixConnPair returned nil")
+		return nil, errors.New("water: socket.TCPConnPair returned nil")
 	}
 
 	conn.callerConn = callerConn
@@ -141,13 +140,13 @@ func accept(core water.Core) (c water.Conn, err error) {
 }
 
 func relay(core water.Core, network, address string) (c water.Conn, err error) {
-	tm := v0.Core2TransportModule(core)
+	tm := UpgradeCore(core)
 	conn := &Conn{
 		tm:        tm,
 		closeOnce: &sync.Once{},
 	}
 
-	dialer := v0.NewManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
+	dialer := NewManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
 
 	if err = conn.tm.LinkNetworkInterface(dialer, core.Config().NetworkListenerOrPanic()); err != nil {
 		return nil, err
@@ -220,13 +219,13 @@ func (c *Conn) Close() (err error) {
 	}
 
 	c.closeOnce.Do(func() {
-		log.Debugf("Defering TM")
+		log.LDebugf(c.tm.core.Logger(), "Defering TM")
 		c.tm.DeferAll()
-		log.Debugf("Canceling TM")
+		log.LDebugf(c.tm.core.Logger(), "Canceling TM")
 		err = c.tm.Cancel()
-		log.Debugf("Cleaning TM")
+		log.LDebugf(c.tm.core.Logger(), "Cleaning TM")
 		c.tm.Cleanup()
-		log.Debugf("TM canceled")
+		log.LDebugf(c.tm.core.Logger(), "TM canceled")
 	})
 
 	return err
