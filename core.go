@@ -13,6 +13,11 @@ import (
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
+var (
+	ErrModuleNotImported = fmt.Errorf("water: importing a module not imported by the WebAssembly module")
+	ErrFuncNotImported   = fmt.Errorf("water: importing a function not imported by the WebAssembly module")
+)
+
 // Core provides the low-level access to the WebAssembly runtime
 // environment.
 type Core interface {
@@ -246,17 +251,11 @@ func (c *core) ImportFunction(module, name string, f any) error {
 	// Unsafe: check if the WebAssembly module really imports this function under
 	// the given module and name. If not, we warn and skip the import.
 	if mod, ok := c.ImportedFunctions()[module]; !ok {
-		log.LWarnf(c.config.Logger(), "water: module %s is not imported, skipping...", module)
-
-		// list all the imported modules
-		for mod := range c.ImportedFunctions() {
-			log.LWarnf(c.config.Logger(), "water: module %s is imported", mod)
-		}
-
-		return nil
+		log.LDebugf(c.config.Logger(), "water: module %s is not imported.", module)
+		return ErrModuleNotImported
 	} else if _, ok := mod[name]; !ok {
-		log.LWarnf(c.config.Logger(), "water: function %s.%s is not imported, skipping...", module, name)
-		return nil
+		log.LWarnf(c.config.Logger(), "water: function %s.%s is not imported.", module, name)
+		return ErrFuncNotImported
 	}
 
 	if _, ok := c.importModules[module]; !ok {

@@ -307,7 +307,9 @@ func (tm *TransportModule) LinkNetworkInterface(dialer *ManagedDialer, listener 
 	}
 
 	if err := tm.core.ImportFunction("env", "host_dial", dialerFunc); err != nil {
-		return fmt.Errorf("water: linking dialer function, (*water.Core).ImportFunction: %w", err)
+		if dialer != nil || err != water.ErrFuncNotImported {
+			return fmt.Errorf("water: linking dialer function, (*water.Core).ImportFunction: %w", err)
+		}
 	}
 
 	var acceptFunc func() (fd int32)
@@ -327,7 +329,9 @@ func (tm *TransportModule) LinkNetworkInterface(dialer *ManagedDialer, listener 
 	}
 
 	if err := tm.core.ImportFunction("env", "host_accept", acceptFunc); err != nil {
-		return fmt.Errorf("water: linking listener function, (*water.Core).ImportFunction: %w", err)
+		if listener != nil || err != water.ErrFuncNotImported {
+			return fmt.Errorf("water: linking listener function, (*water.Core).ImportFunction: %w", err)
+		}
 	}
 
 	return nil
@@ -347,17 +351,33 @@ func (tm *TransportModule) Initialize() error {
 	if err = tm.core.ImportFunction("env", "host_defer", func() {
 		tm.DeferAll()
 	}); err != nil {
-		return fmt.Errorf("water: (*water.Core).ImportFunction returned error "+
-			"when importing host_defer function: %w", err)
+		if err == water.ErrFuncNotImported {
+			log.LWarnf(tm.core.Logger(), "water: host_defer function is not imported by WATM, "+
+				"deferred functions will not be executed when WATM exits")
+		} else {
+			return fmt.Errorf("water: (*water.Core).ImportFunction returned error "+
+				"when importing host_defer function: %w", err)
+		}
 	}
 
 	// import pull_config function (it is called pushConfig here in the host)
-	// if tm.core.ImportedFunctions()["env"]["pull_config"] != nil {
 	if err = tm.core.ImportFunction("env", "pull_config", tm.pushConfig); err != nil {
-		return fmt.Errorf("water: (*water.Core).ImportFunction returned error "+
-			"when importing pull_config function: %w", err)
+		if err == water.ErrFuncNotImported {
+			// If a config is provided, we will warn the user that the config WILL NOT be
+			// pushed to the WASM module.
+			if tm.core.Config().TransportModuleConfig != nil {
+				f, err := tm.core.Config().TransportModuleConfig.AsFile()
+				if f != nil && err == nil {
+					// there is a config file provided, must warn
+					log.LWarnf(tm.core.Logger(), "water: pull_config function is not imported by WATM, "+
+						"config file will not be pushed to the WASM module")
+				}
+			}
+		} else {
+			return fmt.Errorf("water: (*water.Core).ImportFunction returned error "+
+				"when importing pull_config function: %w", err)
+		}
 	}
-	// }
 
 	// instantiate the WASM module
 	if err = tm.core.Instantiate(); err != nil {
