@@ -166,12 +166,12 @@ Currently, it supports the following platforms:
 | Platform | Architecture | Status |
 | -------- | ------------ | ------ | 
 | Linux    | amd64        | ✅     |
-| Linux    | arm64        | ❓<sup>†</sup>     |
+| Linux    | aarch64      | ❓<sup>†</sup>     |
 | Linux    | riscv64	  | ❓<sup>†</sup>     |
 | macOS    | amd64        | ✅     |
-| macOS    | arm64        | ❓<sup>†</sup>     |
+| macOS    | aarch64      | ❓<sup>†</sup>     |
 | Windows  | amd64        | ❌<sup>‡</sup>     |
-| Windows  | arm64        | ❌<sup>‡</sup>     |
+| Windows  | aarch64      | ❌<sup>‡</sup>     |
 
 (✅: supported, ❌: not supported, ❓: not tested)
 
