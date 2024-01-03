@@ -53,8 +53,7 @@ This repo contains a Go package `water`, which implements the runtime library us
 # Usage
 
 <!-- ## API  -->
-Based on **WASI Preview 1 (wasip1)** snapshot, currently W.A.T.E.R. provides a set of
-`net`-like APIs, including `Dialer`, `Listener` and `Relay`.
+Based on **WASI Snapshot Preview 1** (_wasip1_), currently W.A.T.E.R. provides a set of `net`-like APIs via `Dialer`, `Listener` and `Relay`.
 
 ### Dialer
 
@@ -66,14 +65,14 @@ endpoint with the WebAssembly module wrapping / encrypting / transforming the tr
 connection.
 
 ```go
-	wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
+	wasm, _ := os.ReadFile("./examples/v0/plain/plain.wasm")
 
 	config := &water.Config{
-		TMBin:             wasm,
+		TransportModuleBin: wasm,
 	}
 
-	dialer, err := water.NewDialer(config)
-	conn, err := dialer.Dial("tcp", remoteAddr)
+	dialer, _ := water.NewDialer(config)
+	conn, _ := dialer.Dial("tcp", remoteAddr)
 	// ...
 ```
 
@@ -92,21 +91,22 @@ client.
 managing the tunnel obfuscation once a connection is established.
 
 ```go
-	wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
+	wasm, _ := os.ReadFile("./examples/v0/plain/plain.wasm")
 
 	config := &water.Config{
-		TMBin: wasm,
+		TransportModuleBin: wasm,
 	}
 
-	lis, err := config.Listen("tcp", localAddr)
+	lis, _ := config.Listen("tcp", localAddr)
 	defer lis.Close()
-	log.Infof("Listening on %s", lis.Addr().String())
+	log.Printf("Listening on %s", lis.Addr().String())
 
-	clientCntr := 0
 	for {
 		conn, err := lis.Accept()
-		// ...
+		handleConn(conn)
 	}
+
+	// ...
 ```
 
 ### Relay
@@ -121,17 +121,59 @@ connections as well as the associated outgoing connectons.
 to tunnel traffic.
 
 ```go
-	wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
+	wasm, _ := os.ReadFile("./examples/v0/plain/plain.wasm")
 
 	config := &water.Config{
-		TMBin:             wasm,
+		TransportModuleBin: wasm,
 	}
 
-	relay, err := water.NewRelay(config)
+	relay, _ := water.NewRelay(config)
 
-	err = relay.ListenAndRelayTo("tcp", localAddr, "tcp", remoteAddr) // blocking
+	relay.ListenAndRelayTo("tcp", localAddr, "tcp", remoteAddr) // blocking
+```
+
+## Versioning
+
+W.A.T.E.R. is designed to support multiple versions of the WebAssembly Transport Module(WATM) specification at once. The current maximum supported version is `v0`. 
+
+To minimize the size of compiled application binaries importing the `water` package, the support for each version is implemented in separate sub-packages. Developers should import the sub-package that matches the version of the WATM they expect to use.
+
+```go
+import (
+	// ...
+
+	_ "github.com/gaukas/water/transport/v0"
+
+	// ...
+)
+```
+
+Otherwise, it is possible that the W.A.T.E.R. runtime cannot determine the version of the WATM and therefore fail to select the corresponding runtime: 
+
+```go
+panic: failed to listen: water: listener version not found
 ```
 
 ## Example
 
 See [examples](./examples) for example usecase of W.A.T.E.R. API, including `Dialer`, `Listener` and `Relay`.
+
+# Cross-platform Support
+
+W.A.T.E.R. is designed to be cross-platform (and cross-architecture). 
+Currently, it supports the following platforms: 
+
+| Platform | Architecture | Status |
+| -------- | ------------ | ------ | 
+| Linux    | amd64        | ✅     |
+| Linux    | aarch64      | ❓<sup>†</sup>     |
+| Linux    | riscv64	  | ❓<sup>†</sup>     |
+| macOS    | amd64        | ✅     |
+| macOS    | aarch64      | ❓<sup>†</sup>     |
+| Windows  | amd64        | ❌<sup>‡</sup>     |
+| Windows  | aarch64      | ❌<sup>‡</sup>     |
+
+(✅: supported, ❌: not supported, ❓: not tested)
+
+- †: Tests on various platforms are work in progress.
+- ‡: Windows support is currently unavailable due to the lack of async I/O support from Go (via `wazero`). 
