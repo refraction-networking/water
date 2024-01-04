@@ -34,12 +34,15 @@ func ExampleDialer() {
 
 	// start a goroutine to accept connections from the local TCP listener
 	var tcpConn net.Conn
+	var tcpAcceptWg *sync.WaitGroup = new(sync.WaitGroup)
+	tcpAcceptWg.Add(1)
 	go func() {
 		var err error
 		tcpConn, err = tcpListener.Accept()
 		if err != nil {
 			panic(err)
 		}
+		tcpAcceptWg.Done()
 	}()
 
 	waterConn, err := waterDialer.Dial("tcp", tcpListener.Addr().String())
@@ -47,6 +50,9 @@ func ExampleDialer() {
 		panic(err)
 	}
 	defer waterConn.Close()
+
+	// wait for TCP connection to be accepted
+	tcpAcceptWg.Wait()
 
 	var msg = []byte("hello")
 	n, err := waterConn.Write(msg)
