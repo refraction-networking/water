@@ -64,7 +64,10 @@ func testConfigNetworkDialerFuncNotNil(t *testing.T) {
 	}
 
 	dialer := c.NetworkDialerFuncOrDefault()
-	dialer("tcp", "localhost:0")
+	_, err := dialer("tcp", "localhost:0")
+	if err != nil {
+		t.Errorf("NetworkDialerFuncOrDefault() error = %v, want nil", err)
+	}
 
 	if networkBuf != "tcp" || addressBuf != "localhost:0" {
 		t.Errorf("NetworkDialerFuncOrDefault() = %v, want %v", &dialer, &netDialerFunc)

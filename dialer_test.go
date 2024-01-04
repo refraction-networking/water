@@ -12,7 +12,7 @@ import (
 
 var (
 	//go:embed transport/v0/testdata/plain.wasm
-	wasmPlain []byte
+	wasmPlain []byte //nolint:unused
 
 	//go:embed transport/v0/testdata/reverse.wasm
 	wasmReverse []byte

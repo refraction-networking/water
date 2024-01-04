@@ -44,7 +44,10 @@ func ExampleRelay() {
 
 	// in a goroutine, start relay
 	go func() {
-		waterRelay.ListenAndRelayTo("tcp", "localhost:0", "tcp", tcpListener.Addr().String())
+		err := waterRelay.ListenAndRelayTo("tcp", "localhost:0", "tcp", tcpListener.Addr().String())
+		if err != nil {
+			panic(err)
+		}
 	}()
 	time.Sleep(100 * time.Millisecond) // 100ms to spin up relay
 
