@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
-	"os"
 	"runtime"
 	"sync"
 	"testing"
@@ -17,20 +16,14 @@ import (
 
 // ExampleListener demonstrates how to use v0.Listener as a water.Listener.
 func ExampleListener() {
-	// reverse.wasm reverses the message on read/write, bidirectionally.
-	wasm, err := os.ReadFile("../../testdata/v0/reverse.wasm")
-	if err != nil {
-		panic(fmt.Sprintf("failed to read wasm file: %v", err))
-	}
-
-	wrappedTcpListener, err := net.Listen("tcp", ":0")
+	wrappedTcpListener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		panic(fmt.Sprintf("failed to listen: %v", err))
 	}
 
 	// start using W.A.T.E.R. API below this line, have fun!
 	config := &water.Config{
-		TransportModuleBin: wasm,
+		TransportModuleBin: wasmReverse,
 		NetworkListener:    wrappedTcpListener,
 	}
 
@@ -41,57 +34,37 @@ func ExampleListener() {
 	defer waterListener.Close()
 
 	// start a goroutine to dial local TCP connections
+	var tcpConn net.Conn
 	go func() {
-		tcpConn, err := net.Dial("tcp", waterListener.Addr().String())
+		var err error
+		tcpConn, err = net.Dial("tcp", waterListener.Addr().String())
 		if err != nil {
-			panic(fmt.Sprintf("failed to dial: %v", err))
+			panic(err)
 		}
-
-		// start a goroutine to handle the connection
-		go func(tcpConn net.Conn) {
-			// echo everything back
-			defer tcpConn.Close()
-			buf := make([]byte, 1024)
-			for {
-				n, err := tcpConn.Read(buf)
-				if err != nil {
-					return
-				}
-
-				if string(buf[:n]) != "olleh" {
-					panic(fmt.Sprintf("unexpected message: %s", string(buf[:n])))
-				}
-
-				_, err = tcpConn.Write([]byte("hello"))
-				if err != nil {
-					return
-				}
-			}
-		}(tcpConn)
 	}()
 
 	waterConn, err := waterListener.Accept()
 	if err != nil {
-		panic(fmt.Sprintf("failed to accept: %v", err))
+		panic(err)
 	}
 	defer waterConn.Close()
 
 	var msg = []byte("hello")
-	n, err := waterConn.Write(msg)
+	n, err := tcpConn.Write(msg)
 	if err != nil {
-		panic(fmt.Sprintf("failed to write: %v", err))
+		panic(err)
 	}
 	if n != len(msg) {
-		panic(fmt.Sprintf("failed to write: %v", err))
+		panic(err)
 	}
 
 	buf := make([]byte, 1024)
 	n, err = waterConn.Read(buf)
 	if err != nil {
-		panic(fmt.Sprintf("failed to read: %v", err))
+		panic(err)
 	}
 	if n != len(msg) {
-		panic(fmt.Sprintf("failed to read: %v", err))
+		panic(err)
 	}
 
 	fmt.Println(string(buf[:n]))
@@ -107,8 +80,6 @@ func ExampleListener() {
 //  4. Listener must fail when a WebAssembly Transport Module does not
 //     fully implement the v0 listener spec.
 func TestListener(t *testing.T) {
-	loadPlain()
-	loadReverse()
 	t.Run("plain must work", testListenerPlain)
 	t.Run("reverse must work", testListenerReverse)
 	t.Run("bad addr must fail", testListenerBadAddr)
@@ -118,23 +89,19 @@ func TestListener(t *testing.T) {
 func testListenerBadAddr(t *testing.T) {
 	// prepare
 	config := &water.Config{
-		TransportModuleBin: plain,
+		TransportModuleBin: wasmPlain,
 	}
 
 	_, err := config.Listen("tcp", "256.267.278.289:2023")
 	if err == nil {
 		t.Fatal("config.Listen should fail on bad address")
 	}
-
-	// trigger garbage collection
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
 }
 
 func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 	// prepare
 	config := &water.Config{
-		TransportModuleBin: plain,
+		TransportModuleBin: wasmPlain,
 	}
 
 	testLis, err := config.Listen("tcp", "localhost:0")
@@ -277,7 +244,7 @@ func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 func testListenerReverse(t *testing.T) { // skipcq: GO-R1005
 	// prepare
 	config := &water.Config{
-		TransportModuleBin: reverse,
+		TransportModuleBin: wasmReverse,
 	}
 
 	testLis, err := config.Listen("tcp", "localhost:0")
@@ -436,10 +403,9 @@ func testListenerPartialWATM(t *testing.T) {
 //
 // Separate benchmark for the latency measurement will be needed.
 func BenchmarkInboundListener(b *testing.B) {
-	loadPlain()
 	// prepare
 	config := &water.Config{
-		TransportModuleBin: plain,
+		TransportModuleBin: wasmPlain,
 	}
 
 	testLis, err := config.Listen("tcp", "localhost:0")
@@ -494,10 +460,9 @@ func BenchmarkInboundListener(b *testing.B) {
 //
 // Separate benchmark for the latency measurement will be needed.
 func BenchmarkInboundListenerReverse(b *testing.B) {
-	loadReverse()
 	// prepare
 	config := &water.Config{
-		TransportModuleBin: reverse,
+		TransportModuleBin: wasmReverse,
 	}
 
 	testLis, err := config.Listen("tcp", "localhost:0")

@@ -5,40 +5,21 @@ import (
 	"crypto/rand"
 	"errors"
 	"net"
-	"os"
 	"runtime"
 	"sync"
 	"testing"
 	"time"
+
+	_ "embed"
 )
 
 var (
-	plain         []byte
-	loadPlainOnce sync.Once
+	//go:embed testdata/plain.wasm
+	wasmPlain []byte
 
-	reverse         []byte
-	loadReverseOnce sync.Once
+	//go:embed testdata/reverse.wasm
+	wasmReverse []byte
 )
-
-func loadPlain() {
-	loadPlainOnce.Do(func() {
-		var err error
-		plain, err = os.ReadFile("../../testdata/v0/plain.wasm")
-		if err != nil {
-			panic(err)
-		}
-	})
-}
-
-func loadReverse() {
-	loadReverseOnce.Do(func() {
-		var err error
-		reverse, err = os.ReadFile("../../testdata/v0/reverse.wasm")
-		if err != nil {
-			panic(err)
-		}
-	})
-}
 
 func benchmarkUnidirectionalStream(b *testing.B, wrConn, rdConn net.Conn) {
 	var sendMsg []byte = make([]byte, 1024)

@@ -3,7 +3,6 @@ package water_test
 import (
 	"fmt"
 	"net"
-	"os"
 
 	"github.com/gaukas/water"
 	_ "github.com/gaukas/water/transport/v0"
@@ -19,74 +18,48 @@ import (
 // does not bring any essential changes to this example other than the import
 // path and wasm file path.
 func ExampleListener() {
-	// reverse.wasm reverses the message on read/write, bidirectionally.
-	wasm, err := os.ReadFile("./testdata/v0/reverse.wasm")
-	if err != nil {
-		panic(fmt.Sprintf("failed to read wasm file: %v", err))
-	}
-
 	config := &water.Config{
-		TransportModuleBin: wasm,
+		TransportModuleBin: wasmReverse,
 	}
 
-	waterListener, err := config.Listen("tcp", ":0")
+	waterListener, err := config.Listen("tcp", "localhost:0")
 	if err != nil {
-		panic(fmt.Sprintf("failed to listen: %v", err))
+		panic(err)
 	}
 	defer waterListener.Close()
 
 	// start a goroutine to dial local TCP connections
+	var tcpConn net.Conn
 	go func() {
-		tcpConn, err := net.Dial("tcp", waterListener.Addr().String())
+		var err error
+		tcpConn, err = net.Dial("tcp", waterListener.Addr().String())
 		if err != nil {
-			panic(fmt.Sprintf("failed to dial: %v", err))
+			panic(err)
 		}
-
-		// start a goroutine to handle the connection
-		go func(tcpConn net.Conn) {
-			// echo everything back
-			defer tcpConn.Close()
-			buf := make([]byte, 1024)
-			for {
-				n, err := tcpConn.Read(buf)
-				if err != nil {
-					return
-				}
-
-				if string(buf[:n]) != "olleh" {
-					panic(fmt.Sprintf("unexpected message: %s", string(buf[:n])))
-				}
-
-				_, err = tcpConn.Write([]byte("hello"))
-				if err != nil {
-					return
-				}
-			}
-		}(tcpConn)
 	}()
 
 	waterConn, err := waterListener.Accept()
 	if err != nil {
-		panic(fmt.Sprintf("failed to accept: %v", err))
+		panic(err)
 	}
 	defer waterConn.Close()
 
 	var msg = []byte("hello")
-	n, err := waterConn.Write(msg)
+	n, err := tcpConn.Write(msg)
 	if err != nil {
-		panic(fmt.Sprintf("failed to write: %v", err))
+		panic(err)
 	}
 	if n != len(msg) {
-		panic(fmt.Sprintf("failed to write: %v", err))
+		panic(err)
 	}
 
 	buf := make([]byte, 1024)
 	n, err = waterConn.Read(buf)
 	if err != nil {
-		panic(fmt.Sprintf("failed to read: %v", err))
+		panic(err)
 	}
 	if n != len(msg) {
-		panic(fmt.Sprintf("failed to read: %v", err))
+		panic(err)
 	}
 
 	fmt.Println(string(buf[:n]))

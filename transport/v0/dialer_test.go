@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
-	"os"
 	"runtime"
 	"sync"
 	"testing"
@@ -17,80 +16,54 @@ import (
 
 // ExampleDialer demonstrates how to use v0.Dialer as a water.Dialer.
 func ExampleDialer() {
-	// reverse.wasm reverses the message on read/write, bidirectionally.
-	wasm, err := os.ReadFile("../../testdata/v0/reverse.wasm")
-	if err != nil {
-		panic(fmt.Sprintf("failed to read wasm file: %v", err))
-	}
-
 	config := &water.Config{
-		TransportModuleBin: wasm,
+		TransportModuleBin: wasmReverse,
 	}
 
 	waterDialer, err := v0.NewDialer(config)
 	if err != nil {
-		panic(fmt.Sprintf("failed to create dialer: %v", err))
+		panic(err)
 	}
 
 	// create a local TCP listener
-	tcpListener, err := net.Listen("tcp", ":0")
+	tcpListener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		panic(fmt.Sprintf("failed to listen: %v", err))
+		panic(err)
 	}
 	defer tcpListener.Close()
 
 	// start a goroutine to accept connections from the local TCP listener
+	var tcpConn net.Conn
 	go func() {
-		tcpConn, err := tcpListener.Accept()
+		var err error
+		tcpConn, err = tcpListener.Accept()
 		if err != nil {
-			panic(fmt.Sprintf("failed to accept: %v", err))
+			panic(err)
 		}
-
-		// start a goroutine to handle the connection
-		go func(tcpConn net.Conn) {
-			// echo everything back
-			defer tcpConn.Close()
-			buf := make([]byte, 1024)
-			for {
-				n, err := tcpConn.Read(buf)
-				if err != nil {
-					return
-				}
-
-				if string(buf[:n]) != "olleh" {
-					panic(fmt.Sprintf("unexpected message: %s", string(buf[:n])))
-				}
-
-				_, err = tcpConn.Write([]byte("hello"))
-				if err != nil {
-					return
-				}
-			}
-		}(tcpConn)
 	}()
 
 	waterConn, err := waterDialer.Dial("tcp", tcpListener.Addr().String())
 	if err != nil {
-		panic(fmt.Sprintf("failed to dial: %v", err))
+		panic(err)
 	}
 	defer waterConn.Close()
 
 	var msg = []byte("hello")
 	n, err := waterConn.Write(msg)
 	if err != nil {
-		panic(fmt.Sprintf("failed to write: %v", err))
+		panic(err)
 	}
 	if n != len(msg) {
-		panic(fmt.Sprintf("failed to write: %v", err))
+		panic(err)
 	}
 
 	buf := make([]byte, 1024)
-	n, err = waterConn.Read(buf)
+	n, err = tcpConn.Read(buf)
 	if err != nil {
-		panic(fmt.Sprintf("failed to read: %v", err))
+		panic(err)
 	}
 	if n != len(msg) {
-		panic(fmt.Sprintf("failed to read: %v", err))
+		panic(err)
 	}
 
 	fmt.Println(string(buf[:n]))
@@ -106,8 +79,6 @@ func ExampleDialer() {
 //  4. Dialer must fail when a WebAssembly Transport Module does not
 //     fully implement the v0 dialer spec.
 func TestDialer(t *testing.T) {
-	loadPlain()
-	loadReverse()
 	t.Run("plain must work", testDialerPlain)
 	t.Run("reverse must work", testDialerReverse)
 	t.Run("bad addr must fail", testDialerBadAddr)
@@ -117,7 +88,7 @@ func TestDialer(t *testing.T) {
 func testDialerBadAddr(t *testing.T) {
 	// Dial
 	config := &water.Config{
-		TransportModuleBin: plain,
+		TransportModuleBin: wasmPlain,
 	}
 
 	dialer, err := water.NewDialer(config)
@@ -129,10 +100,6 @@ func testDialerBadAddr(t *testing.T) {
 	if err == nil {
 		t.Fatal("dialer.Dial should fail")
 	}
-
-	// trigger garbage collection
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
 }
 
 func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
@@ -153,9 +120,9 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 
 	// Dial using water
 	config := &water.Config{
-		TransportModuleBin: plain,
+		TransportModuleBin: wasmPlain,
 	}
-	dialer, err := water.NewDialer(config)
+	dialer, err := v0.NewDialer(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +265,7 @@ func testDialerReverse(t *testing.T) { // skipcq: GO-R1005
 
 	// Dial using water
 	config := &water.Config{
-		TransportModuleBin: reverse,
+		TransportModuleBin: wasmReverse,
 	}
 	dialer, err := water.NewDialer(config)
 	if err != nil {
@@ -444,7 +411,6 @@ func testDialerPartialWATM(t *testing.T) {
 //
 // Separate benchmark for the latency measurement will be needed.
 func BenchmarkDialerOutbound(b *testing.B) {
-	loadPlain()
 	// create random TCP listener listening on localhost
 	tcpLis, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
@@ -463,7 +429,7 @@ func BenchmarkDialerOutbound(b *testing.B) {
 
 	// Dial
 	config := &water.Config{
-		TransportModuleBin: plain,
+		TransportModuleBin: wasmPlain,
 	}
 	dialer, err := water.NewDialer(config)
 	if err != nil {
@@ -507,7 +473,6 @@ func BenchmarkDialerOutbound(b *testing.B) {
 //
 // Separate benchmark for the latency measurement will be needed.
 func BenchmarkDialerOutboundReverse(b *testing.B) {
-	loadReverse()
 	// create random TCP listener listening on localhost
 	tcpLis, err := net.ListenTCP("tcp", nil)
 	if err != nil {
@@ -526,7 +491,7 @@ func BenchmarkDialerOutboundReverse(b *testing.B) {
 
 	// Dial
 	config := &water.Config{
-		TransportModuleBin: reverse,
+		TransportModuleBin: wasmReverse,
 	}
 	dialer, err := water.NewDialer(config)
 	if err != nil {

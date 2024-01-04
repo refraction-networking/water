@@ -3,10 +3,19 @@ package water_test
 import (
 	"fmt"
 	"net"
-	"os"
+
+	_ "embed"
 
 	"github.com/gaukas/water"
 	_ "github.com/gaukas/water/transport/v0"
+)
+
+var (
+	//go:embed transport/v0/testdata/plain.wasm
+	wasmPlain []byte
+
+	//go:embed transport/v0/testdata/reverse.wasm
+	wasmReverse []byte
 )
 
 // ExampleDialer demonstrates how to use water.Dialer.
@@ -19,82 +28,60 @@ import (
 // does not bring any essential changes to this example other than the import
 // path and wasm file path.
 func ExampleDialer() {
-	// reverse.wasm reverses the message on read/write, bidirectionally.
-	wasm, err := os.ReadFile("./testdata/v0/reverse.wasm")
-	if err != nil {
-		panic(fmt.Sprintf("failed to read wasm file: %v", err))
-	}
-
 	config := &water.Config{
-		TransportModuleBin: wasm,
+		TransportModuleBin: wasmReverse,
 	}
 
 	waterDialer, err := water.NewDialer(config)
 	if err != nil {
-		panic(fmt.Sprintf("failed to create dialer: %v", err))
+		panic(err)
 	}
 
 	// create a local TCP listener
-	tcpListener, err := net.Listen("tcp", ":0")
+	tcpListener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		panic(fmt.Sprintf("failed to listen: %v", err))
+		panic(err)
 	}
 	defer tcpListener.Close()
 
 	// start a goroutine to accept connections from the local TCP listener
+	var tcpConn net.Conn
 	go func() {
-		tcpConn, err := tcpListener.Accept()
+		var err error
+		tcpConn, err = tcpListener.Accept()
 		if err != nil {
-			panic(fmt.Sprintf("failed to accept: %v", err))
+			panic(err)
 		}
-
-		// start a goroutine to handle the connection
-		go func(tcpConn net.Conn) {
-			// echo everything back
-			defer tcpConn.Close()
-			buf := make([]byte, 1024)
-			for {
-				n, err := tcpConn.Read(buf)
-				if err != nil {
-					return
-				}
-
-				if string(buf[:n]) != "olleh" {
-					panic(fmt.Sprintf("unexpected message: %s", string(buf[:n])))
-				}
-
-				_, err = tcpConn.Write([]byte("hello"))
-				if err != nil {
-					return
-				}
-			}
-		}(tcpConn)
 	}()
 
 	waterConn, err := waterDialer.Dial("tcp", tcpListener.Addr().String())
 	if err != nil {
-		panic(fmt.Sprintf("failed to dial: %v", err))
+		panic(err)
 	}
 	defer waterConn.Close()
 
 	var msg = []byte("hello")
 	n, err := waterConn.Write(msg)
 	if err != nil {
-		panic(fmt.Sprintf("failed to write: %v", err))
+		panic(err)
 	}
 	if n != len(msg) {
-		panic(fmt.Sprintf("failed to write: %v", err))
+		panic(err)
 	}
 
 	buf := make([]byte, 1024)
-	n, err = waterConn.Read(buf)
+	n, err = tcpConn.Read(buf)
 	if err != nil {
-		panic(fmt.Sprintf("failed to read: %v", err))
+		panic(err)
 	}
 	if n != len(msg) {
-		panic(fmt.Sprintf("failed to read: %v", err))
+		panic(err)
 	}
 
 	fmt.Println(string(buf[:n]))
 	// Output: olleh
 }
+
+// It is possible to supply further tests with better granularity,
+// but it is not necessary for now since these tests will be duplicated
+// in where they are actually implemented (e.g. transport/v0).
