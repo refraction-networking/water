@@ -163,17 +163,15 @@ See [examples](./examples) for example usecase of W.A.T.E.R. API, including `Dia
 W.A.T.E.R. is designed to be cross-platform (and cross-architecture). 
 Currently, it supports the following platforms: 
 
-| Platform | Architecture | Status |
-| -------- | ------------ | ------ | 
-| Linux    | amd64        | ✅     |
-| Linux    | aarch64      | ❓<sup>†</sup>     |
-| Linux    | riscv64	  | ❓<sup>†</sup>     |
-| macOS    | amd64        | ✅     |
-| macOS    | aarch64      | ❓<sup>†</sup>     |
-| Windows  | amd64        | ❌<sup>‡</sup>     |
-| Windows  | aarch64      | ❌<sup>‡</sup>     |
+| Platform | Architecture | Compiles?† | Tests Pass? |
+| -------- | ------------ | ---------- | ----------- | 
+| Linux    | amd64        | ✅         | ✅         |
+| Linux    | aarch64<sup>†</sup>     | ❓         | ❓         |
+| Linux    | riscv64<sup>†</sup>     | ❓         | ❓         |
+| macOS    | amd64        | ✅         | ✅         |
+| macOS    | aarch64<sup>†</sup>     | ❓         | ❓         |
+| Windows  | amd64<sup>‡</sup>       | ✅         | ❌         |
+| Windows  | aarch64<sup>†‡</sup>    | ❓         | ❌         |
 
-(✅: supported, ❌: not supported, ❓: not tested)
-
-- †: Tests on various platforms are work in progress.
-- ‡: Windows support is currently unavailable due to the lack of async I/O support from Go (via `wazero`). 
+<sup>†</sup> CI covering compilation and testing on non-amd64 platforms are planned and currently being worked on. Community help would be greatly appreciated. <br>
+<sup>‡</sup> Windows support is currently unavailable due to the lack of async I/O support from Go (via `wazero`). 

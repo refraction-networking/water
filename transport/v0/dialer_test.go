@@ -3,6 +3,7 @@ package v0_test
 import (
 	"bytes"
 	"crypto/rand"
+	"fmt"
 	"net"
 	"runtime"
 	"sync"
@@ -13,9 +14,77 @@ import (
 	v0 "github.com/gaukas/water/transport/v0"
 )
 
+// ExampleDialer demonstrates how to use v0.Dialer as a water.Dialer.
+func ExampleDialer() {
+	config := &water.Config{
+		TransportModuleBin: wasmReverse,
+	}
+
+	waterDialer, err := v0.NewDialer(config)
+	if err != nil {
+		panic(err)
+	}
+
+	// create a local TCP listener
+	tcpListener, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		panic(err)
+	}
+	defer tcpListener.Close()
+
+	// start a goroutine to accept connections from the local TCP listener
+	var tcpConn net.Conn
+	var tcpAcceptWg *sync.WaitGroup = new(sync.WaitGroup)
+	tcpAcceptWg.Add(1)
+	go func() {
+		var err error
+		tcpConn, err = tcpListener.Accept()
+		if err != nil {
+			panic(err)
+		}
+		tcpAcceptWg.Done()
+	}()
+
+	waterConn, err := waterDialer.Dial("tcp", tcpListener.Addr().String())
+	if err != nil {
+		panic(err)
+	}
+	defer waterConn.Close()
+
+	// wait for TCP connection to be accepted
+	tcpAcceptWg.Wait()
+
+	var msg = []byte("hello")
+	n, err := waterConn.Write(msg)
+	if err != nil {
+		panic(err)
+	}
+	if n != len(msg) {
+		panic(err)
+	}
+
+	buf := make([]byte, 1024)
+	n, err = tcpConn.Read(buf)
+	if err != nil {
+		panic(err)
+	}
+	if n != len(msg) {
+		panic(err)
+	}
+
+	fmt.Println(string(buf[:n]))
+	// Output: olleh
+}
+
+// TestDialer covers the following cases:
+//  1. Dialer must work with a plain WebAssembly Transport Module that
+//     doesn't transform the message.
+//  2. Dialer must work with a WebAssembly Transport Module that
+//     transforms the message by reversing it.
+//  3. Dialer must fail when an invalid address is supplied.
+//  4. Dialer must fail when a WebAssembly Transport Module does not
+//     fully implement the v0 dialer spec.
 func TestDialer(t *testing.T) {
-	loadPlain()
-	loadReverse()
 	t.Run("plain must work", testDialerPlain)
 	t.Run("reverse must work", testDialerReverse)
 	t.Run("bad addr must fail", testDialerBadAddr)
@@ -25,7 +94,7 @@ func TestDialer(t *testing.T) {
 func testDialerBadAddr(t *testing.T) {
 	// Dial
 	config := &water.Config{
-		TransportModuleBin: plain,
+		TransportModuleBin: wasmPlain,
 	}
 
 	dialer, err := water.NewDialer(config)
@@ -37,10 +106,6 @@ func testDialerBadAddr(t *testing.T) {
 	if err == nil {
 		t.Fatal("dialer.Dial should fail")
 	}
-
-	// trigger garbage collection
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
 }
 
 func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
@@ -61,9 +126,9 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 
 	// Dial using water
 	config := &water.Config{
-		TransportModuleBin: plain,
+		TransportModuleBin: wasmPlain,
 	}
-	dialer, err := water.NewDialer(config)
+	dialer, err := v0.NewDialer(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +271,7 @@ func testDialerReverse(t *testing.T) { // skipcq: GO-R1005
 
 	// Dial using water
 	config := &water.Config{
-		TransportModuleBin: reverse,
+		TransportModuleBin: wasmReverse,
 	}
 	dialer, err := water.NewDialer(config)
 	if err != nil {
@@ -352,7 +417,6 @@ func testDialerPartialWATM(t *testing.T) {
 //
 // Separate benchmark for the latency measurement will be needed.
 func BenchmarkDialerOutbound(b *testing.B) {
-	loadPlain()
 	// create random TCP listener listening on localhost
 	tcpLis, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
@@ -371,7 +435,7 @@ func BenchmarkDialerOutbound(b *testing.B) {
 
 	// Dial
 	config := &water.Config{
-		TransportModuleBin: plain,
+		TransportModuleBin: wasmPlain,
 	}
 	dialer, err := water.NewDialer(config)
 	if err != nil {
@@ -415,7 +479,6 @@ func BenchmarkDialerOutbound(b *testing.B) {
 //
 // Separate benchmark for the latency measurement will be needed.
 func BenchmarkDialerOutboundReverse(b *testing.B) {
-	loadReverse()
 	// create random TCP listener listening on localhost
 	tcpLis, err := net.ListenTCP("tcp", nil)
 	if err != nil {
@@ -434,7 +497,7 @@ func BenchmarkDialerOutboundReverse(b *testing.B) {
 
 	// Dial
 	config := &water.Config{
-		TransportModuleBin: reverse,
+		TransportModuleBin: wasmReverse,
 	}
 	dialer, err := water.NewDialer(config)
 	if err != nil {
