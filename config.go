@@ -56,7 +56,7 @@ func (c *Config) Clone() *Config {
 	copy(wasmClone, c.TransportModuleBin)
 
 	return &Config{
-		TransportModuleBin:    c.TransportModuleBin,
+		TransportModuleBin:    wasmClone,
 		NetworkDialerFunc:     c.NetworkDialerFunc,
 		NetworkListener:       c.NetworkListener,
 		TransportModuleConfig: c.TransportModuleConfig,
