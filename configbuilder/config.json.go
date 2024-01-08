@@ -6,8 +6,8 @@ package configbuilder
 // non-trivial to represent a func or other non-serialized structures.
 type ConfigJSON struct {
 	TransportModule struct {
-		Bin    []byte `json:"bin"`              // Base64 encoded .wasm binary
-		Config []byte `json:"config,omitempty"` // Base64 encoded WATM config file content
+		BinPath    string `json:"bin"`              // Path to the transport module binary
+		ConfigPath string `json:"config,omitempty"` // Path to the transport module config file
 	} `json:"transport_module"`
 
 	Network struct {
@@ -24,6 +24,6 @@ type ConfigJSON struct {
 		InheritStdin  bool              `json:"inherit_stdin,omitempty"`
 		InheritStdout bool              `json:"inherit_stdout,omitempty"`
 		InheritStderr bool              `json:"inherit_stderr,omitempty"`
-		PreopenedDir  map[string]string `json:"preopened_dir,omitempty"` // hostPath: guestPath
+		PreopenedDirs map[string]string `json:"preopened_dirs,omitempty"` // hostPath: guestPath
 	} `json:"module,omitempty"`
 }
