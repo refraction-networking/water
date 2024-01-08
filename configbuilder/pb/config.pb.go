@@ -245,8 +245,8 @@ type Module struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Argv          []string          `protobuf:"bytes,1,rep,name=argv,proto3" json:"argv,omitempty"`
-	Env           map[string]string `protobuf:"bytes,2,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Argv          []string          `protobuf:"bytes,1,rep,name=argv,proto3" json:"argv,omitempty"`                                                                                       // warning: this is not a recommended way to pass configuration parameters to the module, use transport_module.config instead.
+	Env           map[string]string `protobuf:"bytes,2,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"` // warning: this is not a recommended way to pass configuration parameters to the module, use transport_module.config instead.
 	InheritStdin  bool              `protobuf:"varint,3,opt,name=inherit_stdin,json=inheritStdin,proto3" json:"inherit_stdin,omitempty"`
 	InheritStdout bool              `protobuf:"varint,4,opt,name=inherit_stdout,json=inheritStdout,proto3" json:"inherit_stdout,omitempty"`
 	InheritStderr bool              `protobuf:"varint,5,opt,name=inherit_stderr,json=inheritStderr,proto3" json:"inherit_stderr,omitempty"`

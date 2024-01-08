@@ -19,8 +19,8 @@ type ConfigJSON struct {
 	} `json:"network,omitempty"`
 
 	Module struct {
-		Argv          []string          `json:"argv,omitempty"`
-		Env           map[string]string `json:"env,omitempty"`
+		Argv          []string          `json:"argv,omitempty"` // Warning: this isn't a recommended way to pass configuration to the WebAssembly module. Instead, use TransportModuleConfig for a serializable configuration file.
+		Env           map[string]string `json:"env,omitempty"`  // Warning: this isn't a recommended way to pass configuration to the WebAssembly module. Instead, use TransportModuleConfig for a serializable configuration file.
 		InheritStdin  bool              `json:"inherit_stdin,omitempty"`
 		InheritStdout bool              `json:"inherit_stdout,omitempty"`
 		InheritStderr bool              `json:"inherit_stderr,omitempty"`
