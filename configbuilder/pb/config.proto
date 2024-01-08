@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package water;
+
+option go_package = "github.com/gaukas/water/configbuilder/pb";
+
+message Config {
+    TransportModule transport_module = 1;
+    Network network = 2;
+    Module module = 3;
+}
+
+message TransportModule {
+    bytes bin = 1;
+    bytes config = 2;
+}
+
+message Network {
+    Listener listener = 1;
+}
+
+message Listener {
+    string network = 1;
+    string address = 2; // ip:port
+}    
+
+message Module {
+    repeated string argv = 1; // warning: this is not a recommended way to pass configuration parameters to the module, use transport_module.config instead. 
+    map<string, string> env = 2; // warning: this is not a recommended way to pass configuration parameters to the module, use transport_module.config instead.
+    bool inherit_stdin = 3;
+    bool inherit_stdout = 4;
+    bool inherit_stderr = 5;
+    map<string, string> preopened_dirs = 6;
+}

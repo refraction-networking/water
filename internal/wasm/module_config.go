@@ -41,14 +41,29 @@ func (mcf *ModuleConfigFactory) GetConfig() (wazero.ModuleConfig, error) {
 	return mcf.moduleConfig.WithFSConfig(mcf.fsconfig), nil
 }
 
+// SetArgv sets the arguments for the WebAssembly module.
+//
+// Warning: this isn't a recommended way to pass configuration to the
+// WebAssembly module. Instead, use TransportModuleConfig for a serializable
+// configuration file.
 func (mcf *ModuleConfigFactory) SetArgv(argv []string) {
 	mcf.moduleConfig = mcf.moduleConfig.WithArgs(argv...)
 }
 
+// InheritArgv sets the arguments for the WebAssembly module to os.Args.
+//
+// Warning: this isn't a recommended way to pass configuration to the
+// WebAssembly module. Instead, use TransportModuleConfig for a serializable
+// configuration file.
 func (mcf *ModuleConfigFactory) InheritArgv() {
 	// TODO: enumerate os.Args or deprecate this
 }
 
+// SetEnv sets the environment variables for the WebAssembly module.
+//
+// Warning: this isn't a recommended way to pass configuration to the
+// WebAssembly module. Instead, use TransportModuleConfig for a serializable
+// configuration file.
 func (mcf *ModuleConfigFactory) SetEnv(keys, values []string) {
 	if len(keys) != len(values) {
 		panic("water: SetEnv: keys and values must have the same length")
@@ -59,6 +74,12 @@ func (mcf *ModuleConfigFactory) SetEnv(keys, values []string) {
 	}
 }
 
+// InheritEnv sets the environment variables for the WebAssembly module to
+// os.Environ.
+//
+// Warning: this isn't a recommended way to pass configuration to the
+// WebAssembly module. Instead, use TransportModuleConfig for a serializable
+// configuration file.
 func (wcf *ModuleConfigFactory) InheritEnv() {
 	// TODO: enumerate os.Environ or deprecate this
 }
