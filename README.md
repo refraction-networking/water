@@ -1,5 +1,5 @@
 # W.A.T.E.R.: WebAssembly Transport Executables Runtime
-![License](https://img.shields.io/github/license/gaukas/water?label=License)
+[![License](https://img.shields.io/github/license/gaukas/water)](https://github.com/gaukas/water/blob/master/LICENSE)
 [![FOSSA](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgaukas%2Fwater.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgaukas%2Fwater?ref=badge_shield&issueType=license)
 [![CI](https://github.com/gaukas/water/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/gaukas/water/actions/workflows/go.yml)
 [![Go Doc](https://pkg.go.dev/badge/github.com/gaukas/water.svg)](https://pkg.go.dev/github.com/gaukas/water)
