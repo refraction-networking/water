@@ -5,18 +5,8 @@ import (
 	"net"
 	"sync"
 
-	_ "embed"
-
 	"github.com/gaukas/water"
 	_ "github.com/gaukas/water/transport/v0"
-)
-
-var (
-	//go:embed transport/v0/testdata/plain.wasm
-	wasmPlain []byte //nolint:unused
-
-	//go:embed transport/v0/testdata/reverse.wasm
-	wasmReverse []byte
 )
 
 // ExampleDialer demonstrates how to use water.Dialer.

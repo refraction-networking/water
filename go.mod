@@ -2,7 +2,7 @@ module github.com/gaukas/water
 
 go 1.20
 
-replace github.com/tetratelabs/wazero v1.6.0 => github.com/gaukas/wazero v1.6.0-w
+replace github.com/tetratelabs/wazero v1.6.0 => github.com/gaukas/wazero v1.6.1-w
 
 require (
 	github.com/tetratelabs/wazero v1.6.0
