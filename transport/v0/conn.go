@@ -51,9 +51,13 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 		return nil, err
 	}
 
+	log.Infof("water: dial: conn.tm.LinkNetworkInterface() returned")
+
 	if err = conn.tm.Initialize(); err != nil {
 		return nil, err
 	}
+
+	log.Infof("water: dial: conn.tm.Initialize() returned")
 
 	reverseCallerConn, callerConn, err := socket.TCPConnPair()
 	// wasmCallerConn, conn.uoConn, err = socket.TCPConnPair()
