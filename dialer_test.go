@@ -3,7 +3,6 @@ package water_test
 import (
 	"fmt"
 	"net"
-	"sync"
 
 	"github.com/gaukas/water"
 	_ "github.com/gaukas/water/transport/v0"
@@ -33,29 +32,19 @@ func ExampleDialer() {
 	if err != nil {
 		panic(err)
 	}
-	defer tcpListener.Close()
-
-	// start a goroutine to accept connections from the local TCP listener
-	var tcpConn net.Conn
-	var tcpAcceptWg *sync.WaitGroup = new(sync.WaitGroup)
-	tcpAcceptWg.Add(1)
-	go func() {
-		var err error
-		tcpConn, err = tcpListener.Accept()
-		if err != nil {
-			panic(err)
-		}
-		tcpAcceptWg.Done()
-	}()
+	defer tcpListener.Close() // skipcq: GO-S2307
 
 	waterConn, err := waterDialer.Dial("tcp", tcpListener.Addr().String())
 	if err != nil {
 		panic(err)
 	}
-	defer waterConn.Close()
+	defer waterConn.Close() // skipcq: GO-S2307
 
-	// wait for TCP connection to be accepted
-	tcpAcceptWg.Wait()
+	tcpConn, err := tcpListener.Accept()
+	if err != nil {
+		panic(err)
+	}
+	defer tcpConn.Close() // skipcq: GO-S2307
 
 	var msg = []byte("hello")
 	n, err := waterConn.Write(msg)

@@ -13,7 +13,7 @@ import (
 
 // TCPConnPair returns a pair of connected net.TCPConn.
 func TCPConnPair(address ...string) (c1, c2 *net.TCPConn, err error) {
-	var addr string = ":0"
+	var addr string = "localhost:0" // use a localhost TCP connection by default
 	if len(address) > 0 && address[0] != "" {
 		addr = address[0]
 	}

@@ -21,16 +21,7 @@ func ExampleRelay() {
 	if err != nil {
 		panic(err)
 	}
-
-	// use a goroutine to accept incoming connections
-	var serverConn net.Conn
-	var serverAcceptErr error
-	var serverAcceptWg *sync.WaitGroup = new(sync.WaitGroup)
-	serverAcceptWg.Add(1)
-	go func() {
-		serverConn, serverAcceptErr = tcpListener.Accept()
-		serverAcceptWg.Done()
-	}()
+	defer tcpListener.Close() // skipcq: GO-S2307
 
 	config := &water.Config{
 		TransportModuleBin: wasmReverse,
@@ -40,7 +31,7 @@ func ExampleRelay() {
 	if err != nil {
 		panic(err)
 	}
-	defer waterRelay.Close()
+	defer waterRelay.Close() // skipcq: GO-S2307
 
 	// in a goroutine, start relay
 	go func() {
@@ -58,9 +49,8 @@ func ExampleRelay() {
 	}
 	defer clientConn.Close() // skipcq: GO-S2307
 
-	// wait for server to accept connection
-	serverAcceptWg.Wait()
-	if serverAcceptErr != nil {
+	serverConn, err := tcpListener.Accept()
+	if err != nil {
 		panic(err)
 	}
 	defer serverConn.Close() // skipcq: GO-S2307
@@ -99,7 +89,7 @@ func TestRelay(t *testing.T) {
 
 func testRelayPlain(t *testing.T) { // skipcq: GO-R1005
 	// test destination: a local TCP server
-	tcpLis, err := net.ListenTCP("tcp", nil)
+	tcpLis, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,20 +235,11 @@ func testRelayPlain(t *testing.T) { // skipcq: GO-R1005
 
 func testRelayReverse(t *testing.T) { // skipcq: GO-R1005
 	// test destination: a local TCP server
-	tcpLis, err := net.ListenTCP("tcp", nil)
+	tcpLis, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// goroutine to accept incoming connections
-	var serverConn net.Conn
-	var serverAcceptErr error
-	var serverAcceptWg *sync.WaitGroup = new(sync.WaitGroup)
-	serverAcceptWg.Add(1)
-	go func() {
-		serverConn, serverAcceptErr = tcpLis.Accept()
-		serverAcceptWg.Done()
-	}()
+	defer tcpLis.Close() // skipcq: GO-S2307
 
 	// setup relay
 	config := &water.Config{
@@ -286,10 +267,9 @@ func testRelayReverse(t *testing.T) { // skipcq: GO-R1005
 	}
 	defer clientConn.Close() // skipcq: GO-S2307
 
-	// wait for server to accept connection
-	serverAcceptWg.Wait()
-	if serverAcceptErr != nil {
-		t.Fatal(serverAcceptErr)
+	serverConn, err := tcpLis.Accept()
+	if err != nil {
+		t.Fatal(err)
 	}
 	defer serverConn.Close() // skipcq: GO-S2307
 
