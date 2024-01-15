@@ -88,8 +88,10 @@ const (
 	EOPNOTSUPP = ENOTSUP
 )
 
+// ErrnoStr is for reference only, it is not used in the code.
+//
 // TODO: Auto-generate some day. (Hard-coded in binaries so not likely to change.)
-var errorstr = [...]string{
+var ErrnoStr = [...]string{
 	E2BIG:           "Argument list too long",
 	EACCES:          "Permission denied",
 	EADDRINUSE:      "Address already in use",
