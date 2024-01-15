@@ -29,7 +29,7 @@ type TransportModule struct {
 	//  - Records the `callerConnFd`. This will be the fd it used to read/write data from/to
 	//  the caller.
 	//  - Returns `remoteConnFd` to the caller.
-	_dial func(int32) (int32, error) // _dial(callerConnFd i32) -> (remoteConnFd i32)
+	_dial func(int32) (int32, error) // _water_dial(callerConnFd i32) -> (remoteConnFd i32)
 
 	// _accept:
 	//  - Calls to `env.host_accept() -> fd: i32` to accept a network connection and bind it
@@ -38,7 +38,7 @@ type TransportModule struct {
 	//  - Records the `callerConnFd`. This will be the fd it used to read/write data from/to
 	//  the caller.
 	//  - Returns `sourceConnFd` to the caller.
-	_accept func(int32) (int32, error) // _accept(callerConnFd i32) -> (sourceConnFd i32)
+	_accept func(int32) (int32, error) // _water_accept(callerConnFd i32) -> (sourceConnFd i32)
 
 	// _associate:
 	//  - Calls to `env.host_accept() -> fd: i32` to accept a network connection and bind it
@@ -48,7 +48,7 @@ type TransportModule struct {
 	//  of its file descriptors, record the fd for `remoteConnFd`. This will be the fd it used
 	//  to read/write data from/to the remote destination.
 	//  - Returns 0 to the caller or an error code if any of the above steps failed.
-	_associate func() (int32, error) // _associate() -> (err i32)
+	_associate func() (int32, error) // _water_associate() -> (err i32)
 
 	// backgroundWorker is used to replace the deprecated read-write-close model.
 	// We put it in a inlined struct for better code styling.
@@ -61,7 +61,7 @@ type TransportModule struct {
 		// This is a workaround for not being able to call another WASM function until the
 		// current one returns. And apparently this function needs to be called BEFORE the
 		// blocking _worker() function.
-		_cancel_with func(int32) (int32, error) // _cancel_with(fd i32) -> (err i32)
+		_cancel_with func(int32) (int32, error) // _water_cancel_with(fd i32) -> (err i32)
 
 		// _worker provides a blocking function for the WASM module to run a worker thread.
 		// In the worker thread, WASM module should select on all previously pushed sockets
@@ -75,7 +75,7 @@ type TransportModule struct {
 		// The worker thread should exit and return when the cancellation pipe is available
 		// for reading. For the current design, the content read from the pipe does not
 		// include meaningful data.
-		_worker func() (int32, error) // _worker() (err int32)
+		_worker func() (int32, error) // _water_worker() (err int32)
 
 		// a channel used to send errors from the worker thread to the host in a non-blocking
 		// manner. When the worker thread exits, this channel will be closed.
