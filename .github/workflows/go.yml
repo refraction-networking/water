@@ -68,6 +68,8 @@ jobs:
   go_test_race:
     name: Go Race Detection
     runs-on: "ubuntu-latest"
+    env:
+      CGO_ENABLED: 1 # go: -race requires cgo; enable cgo by setting CGO_ENABLED=1
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-go@v4
