@@ -8,7 +8,6 @@ import (
 
 	"github.com/gaukas/water/configbuilder"
 	"github.com/gaukas/water/internal/log"
-	"github.com/gaukas/water/internal/wasm"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -46,7 +45,7 @@ type Config struct {
 	// Caller is supposed to call c.ModuleConfig() to get the pointer to the
 	// ModuleConfigFactory. If the pointer is nil, a new ModuleConfigFactory will
 	// be created and returned.
-	ModuleConfigFactory *wasm.ModuleConfigFactory
+	ModuleConfigFactory *WazeroModuleConfigFactory
 
 	OverrideLogger *log.Logger // essentially a *slog.Logger, currently using an alias to flatten the version discrepancy
 }
@@ -100,9 +99,9 @@ func (c *Config) WATMBinOrPanic() []byte {
 
 // ModuleConfig returns the ModuleConfigFactory. If the pointer is
 // nil, a new ModuleConfigFactory will be created and returned.
-func (c *Config) ModuleConfig() *wasm.ModuleConfigFactory {
+func (c *Config) ModuleConfig() *WazeroModuleConfigFactory {
 	if c.ModuleConfigFactory == nil {
-		c.ModuleConfigFactory = wasm.NewModuleConfigFactory()
+		c.ModuleConfigFactory = NewWazeroModuleConfigFactory()
 
 		// by default, stdout and stderr are inherited
 		c.ModuleConfigFactory.InheritStdout()
@@ -161,7 +160,7 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	c.ModuleConfigFactory = wasm.NewModuleConfigFactory()
+	c.ModuleConfigFactory = NewWazeroModuleConfigFactory()
 	if len(confJson.Module.Argv) > 0 {
 		c.ModuleConfigFactory.SetArgv(confJson.Module.Argv)
 	}
@@ -228,7 +227,7 @@ func (c *Config) UnmarshalProto(b []byte) error {
 	}
 
 	// Parse ModuleConfigFactory
-	c.ModuleConfigFactory = wasm.NewModuleConfigFactory()
+	c.ModuleConfigFactory = NewWazeroModuleConfigFactory()
 	if len(confProto.GetModule().GetArgv()) > 0 {
 		c.ModuleConfigFactory.SetArgv(confProto.Module.Argv)
 	}
