@@ -169,9 +169,9 @@ Currently, it supports the following platforms:
 | linux/aarch64      | ✅        | ✅         |
 | linux/riscv64      | ✅        | ✅         |
 | macos/amd64        | ✅        | ✅         |
-| macos/aarch64      | ❓        | ❓         |
+| macos/aarch64      | ✅        | ✅         |
 | windows/amd64      | ✅        | ✅         |
-| windows/aarch64    | ❓        | ❓         |
+| windows/aarch64    | ✅        | ❓         |
 | others             | ❓        | ❓         |
 
 ## Acknowledgments
