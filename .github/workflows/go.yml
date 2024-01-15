@@ -22,8 +22,8 @@ jobs:
     - run: go version
     - name: Build and Test
       run:  |
-        go build -v ./...
-        go test -v ./...
+        CGO_ENABLED=0 go build -v ./...
+        CGO_ENABLED=0 go test -v ./...
 
   test_linux-non-amd64:
     name: go${{ matrix.go }} (linux/${{ matrix.arch }})
@@ -42,8 +42,25 @@ jobs:
       uses: docker/setup-qemu-action@v3
     - name: Build and Test
       run:  |
-        GOARCH=${{ matrix.arch }} go build -v ./...
-        GOARCH=${{ matrix.arch }} go test -v ./...
+        CGO_ENABLED=0 GOARCH=${{ matrix.arch }} go build -v ./...
+        CGO_ENABLED=0 GOARCH=${{ matrix.arch }} go test -v ./...
+
+  test_macos-arm64:
+    name: go${{ matrix.go }} (macos/arm64)
+    strategy:
+      matrix:
+        go: [ "1.20", "1.21" ] # we support the latest 2 stable versions of Go
+    runs-on: flyci-macos-large-latest-m1 # generously provided by www.flyci.net
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go }}.x # use latest patch version under the minor version
+    - run: go version
+    - name: Build and Test
+      run:  |
+        CGO_ENABLED=0 go build -v ./...
+        CGO_ENABLED=0 go test -v ./...
 
   go_test_race:
     name: Go Race Detection
@@ -74,4 +91,3 @@ jobs:
           # When `install-mode` is `goinstall` the value can be v1.2.3, `latest`, or the hash of a commit.
           version: v1.54
           args: -v --disable structcheck,govet --timeout 5m
-
