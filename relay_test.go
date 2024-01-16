@@ -3,7 +3,6 @@ package water_test
 import (
 	"fmt"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/gaukas/water"
@@ -25,16 +24,7 @@ func ExampleRelay() {
 	if err != nil {
 		panic(err)
 	}
-
-	// use a goroutine to accept incoming connections
-	var serverConn net.Conn
-	var serverAcceptErr error
-	var serverAcceptWg *sync.WaitGroup = new(sync.WaitGroup)
-	serverAcceptWg.Add(1)
-	go func() {
-		serverConn, serverAcceptErr = tcpListener.Accept()
-		serverAcceptWg.Done()
-	}()
+	defer tcpListener.Close() // skipcq: GO-S2307
 
 	config := &water.Config{
 		TransportModuleBin: wasmReverse,
@@ -44,7 +34,7 @@ func ExampleRelay() {
 	if err != nil {
 		panic(err)
 	}
-	defer waterRelay.Close()
+	defer waterRelay.Close() // skipcq: GO-S2307
 
 	// in a goroutine, start relay
 	go func() {
@@ -62,9 +52,8 @@ func ExampleRelay() {
 	}
 	defer clientConn.Close() // skipcq: GO-S2307
 
-	// wait for server to accept connection
-	serverAcceptWg.Wait()
-	if serverAcceptErr != nil {
+	serverConn, err := tcpListener.Accept()
+	if err != nil {
 		panic(err)
 	}
 	defer serverConn.Close() // skipcq: GO-S2307

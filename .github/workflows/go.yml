@@ -6,34 +6,70 @@ on:
   pull_request:
     branches: [ "master" ]
 
+env:
+  CGO_ENABLED: 0
+
 jobs:
   test_amd64:
-    name: ${{ matrix.os }}-${{ matrix.arch }}, Go ${{ matrix.go }}
+    name: go${{ matrix.go }} (${{ matrix.os }}/amd64)
     strategy:
-      fail-fast: true
       matrix:
-        os: [ "ubuntu-latest", "windows-latest", "macos-latest" ] # Windows is not supported until wazero implements full async I/O for Windows
-        go: [ "1.20.x", "1.21.x" ]
-        arch: [ "amd64" ]
-    runs-on: ${{ matrix.os }}
+        os: [ "ubuntu", "windows", "macos" ] 
+        go: [ "1.20", "1.21" ] # we support the latest 2 stable versions of Go
+    runs-on: ${{ matrix.os }}-latest # use latest OS image
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-go@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
       with:
-        go-version: ${{ matrix.go }}
+        go-version: ${{ matrix.go }}.x # use latest patch version under the minor version
     - run: go version
-    - name: Go Build
-      run: go build -v ./...
-    - name: Go Test
-      if: ${{ matrix.os != 'windows-latest' }}
-      run: go test ./...
-    - name: Create skipping notice for Windows
-      if: ${{ matrix.os == 'windows-latest' }}
-      run: echo "::notice::Testing on Windows target is skipped until async I/O is properly supported."
-  
+    - name: Build and Test
+      run:  |
+        go build -v ./...
+        go test -v ./...
+
+  test_linux-arm64-and-riscv64:
+    name: go${{ matrix.go }} (linux/${{ matrix.arch }})
+    strategy:
+      matrix:
+        go: [ "1.20", "1.21" ] # we support the latest 2 stable versions of Go
+        arch: [ "arm64", "riscv64" ]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go }}.x  # use latest patch version under the minor version
+    - name: Install QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: Build and Test
+      run:  |
+        GOARCH=${{ matrix.arch }} go build -v ./...
+        GOARCH=${{ matrix.arch }} go test -v ./...
+
+  test_macos-arm64:
+    name: go${{ matrix.go }} (macos/arm64)
+    strategy:
+      matrix:
+        go: [ "1.20", "1.21" ] # we support the latest 2 stable versions of Go
+    runs-on: flyci-macos-large-latest-m1 # generously provided by www.flyci.net
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go }}.x # use latest patch version under the minor version
+    - run: go version
+    - name: Build and Test
+      run:  |
+        go build -v ./...
+        go test -v ./...
+
   go_test_race:
-    name: Race Detection
+    name: Go Race Detection
     runs-on: "ubuntu-latest"
+    env:
+      CGO_ENABLED: 1 # go: -race requires cgo; enable cgo by setting CGO_ENABLED=1
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-go@v4
@@ -42,7 +78,7 @@ jobs:
     - run: go version
     - name: Go Test
       run: go test -race ./...
-  
+
   golangci-lint:
     name: lint
     runs-on: "ubuntu-latest"
@@ -60,4 +96,3 @@ jobs:
           # When `install-mode` is `goinstall` the value can be v1.2.3, `latest`, or the hash of a commit.
           version: v1.54
           args: -v --disable structcheck,govet --timeout 5m
-

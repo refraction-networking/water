@@ -26,23 +26,19 @@ func ExampleListener() {
 	if err != nil {
 		panic(err)
 	}
-	defer waterListener.Close()
+	defer waterListener.Close() // skipcq: GO-S2307
 
-	// start a goroutine to dial local TCP connections
-	var tcpConn net.Conn
-	go func() {
-		var err error
-		tcpConn, err = net.Dial("tcp", waterListener.Addr().String())
-		if err != nil {
-			panic(err)
-		}
-	}()
+	tcpConn, err := net.Dial("tcp", waterListener.Addr().String())
+	if err != nil {
+		panic(err)
+	}
+	defer tcpConn.Close() // skipcq: GO-S2307
 
 	waterConn, err := waterListener.Accept()
 	if err != nil {
 		panic(err)
 	}
-	defer waterConn.Close()
+	defer waterConn.Close() // skipcq: GO-S2307
 
 	var msg = []byte("hello")
 	n, err := tcpConn.Write(msg)

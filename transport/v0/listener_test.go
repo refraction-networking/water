@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"runtime"
-	"sync"
 	"testing"
 	"time"
 
@@ -31,23 +30,19 @@ func ExampleListener() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to listen: %v", err))
 	}
-	defer waterListener.Close()
+	defer waterListener.Close() // skipcq: GO-S2307
 
-	// start a goroutine to dial local TCP connections
-	var tcpConn net.Conn
-	go func() {
-		var err error
-		tcpConn, err = net.Dial("tcp", waterListener.Addr().String())
-		if err != nil {
-			panic(err)
-		}
-	}()
+	tcpConn, err := net.Dial("tcp", waterListener.Addr().String())
+	if err != nil {
+		panic(err)
+	}
+	defer tcpConn.Close() // skipcq: GO-S2307
 
 	waterConn, err := waterListener.Accept()
 	if err != nil {
 		panic(err)
 	}
-	defer waterConn.Close()
+	defer waterConn.Close() // skipcq: GO-S2307
 
 	var msg = []byte("hello")
 	n, err := tcpConn.Write(msg)
@@ -108,16 +103,7 @@ func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// goroutine to accept incoming connections
-	var conn net.Conn
-	var goroutineErr error
-	var wg *sync.WaitGroup = new(sync.WaitGroup)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		conn, goroutineErr = testLis.Accept()
-	}()
+	defer testLis.Close() // skipcq: GO-S2307
 
 	// Dial with net.Dial
 	peerConn, err := net.Dial("tcp", testLis.Addr().String())
@@ -126,10 +112,9 @@ func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 	}
 	defer peerConn.Close() // skipcq: GO-S2307
 
-	// wait for listener to accept connection
-	wg.Wait()
-	if goroutineErr != nil {
-		t.Fatal(goroutineErr)
+	conn, err := testLis.Accept()
+	if err != nil {
+		t.Fatal(err)
 	}
 	defer conn.Close() // skipcq: GO-S2307
 
@@ -251,16 +236,7 @@ func testListenerReverse(t *testing.T) { // skipcq: GO-R1005
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// goroutine to accept incoming connections
-	var conn net.Conn
-	var goroutineErr error
-	var wg *sync.WaitGroup = new(sync.WaitGroup)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		conn, goroutineErr = testLis.Accept()
-	}()
+	defer testLis.Close() // skipcq: GO-S2307
 
 	// Dial with net.Dial
 	peerConn, err := net.Dial("tcp", testLis.Addr().String())
@@ -269,10 +245,9 @@ func testListenerReverse(t *testing.T) { // skipcq: GO-R1005
 	}
 	defer peerConn.Close() // skipcq: GO-S2307
 
-	// wait for listener to accept connection
-	wg.Wait()
-	if goroutineErr != nil {
-		t.Fatal(goroutineErr)
+	conn, err := testLis.Accept()
+	if err != nil {
+		t.Fatal(err)
 	}
 	defer conn.Close() // skipcq: GO-S2307
 
@@ -412,16 +387,7 @@ func BenchmarkInboundListener(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-
-	// goroutine to accept incoming connections
-	var waterConn net.Conn
-	var goroutineErr error
-	var wg *sync.WaitGroup = new(sync.WaitGroup)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		waterConn, goroutineErr = testLis.Accept()
-	}()
+	defer testLis.Close() // skipcq: GO-S2307
 
 	// Dial with net.Dial
 	peerConn, err := net.Dial("tcp", testLis.Addr().String())
@@ -430,11 +396,11 @@ func BenchmarkInboundListener(b *testing.B) {
 	}
 	defer peerConn.Close() // skipcq: GO-S2307
 
-	// wait for listener to accept connection
-	wg.Wait()
-	if goroutineErr != nil {
-		b.Fatal(goroutineErr)
+	waterConn, err := testLis.Accept()
+	if err != nil {
+		b.Fatal(err)
 	}
+	defer waterConn.Close() // skipcq: GO-S2307
 
 	err = sanityCheckConn(peerConn, waterConn, []byte("hello"), []byte("hello"))
 	if err != nil {
@@ -470,16 +436,6 @@ func BenchmarkInboundListenerReverse(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	// goroutine to accept incoming connections
-	var waterConn net.Conn
-	var goroutineErr error
-	var wg *sync.WaitGroup = new(sync.WaitGroup)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		waterConn, goroutineErr = testLis.Accept()
-	}()
-
 	// Dial with net.Dial
 	peerConn, err := net.Dial("tcp", testLis.Addr().String())
 	if err != nil {
@@ -487,10 +443,9 @@ func BenchmarkInboundListenerReverse(b *testing.B) {
 	}
 	defer peerConn.Close() // skipcq: GO-S2307
 
-	// wait for listener to accept connection
-	wg.Wait()
-	if goroutineErr != nil {
-		b.Fatal(goroutineErr)
+	waterConn, err := testLis.Accept()
+	if err != nil {
+		b.Fatal(err)
 	}
 
 	err = sanityCheckConn(peerConn, waterConn, []byte("hello"), []byte("olleh"))

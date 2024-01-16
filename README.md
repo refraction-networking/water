@@ -163,15 +163,28 @@ See [examples](./examples) for example usecase of W.A.T.E.R. API, including `Dia
 W.A.T.E.R. is designed to be cross-platform (and cross-architecture). 
 Currently, it supports the following platforms: 
 
-| Platform | Architecture | Compiles?† | Tests Pass? |
-| -------- | ------------ | ---------- | ----------- | 
-| Linux    | amd64        | ✅         | ✅         |
-| Linux    | aarch64<sup>†</sup>     | ❓         | ❓         |
-| Linux    | riscv64<sup>†</sup>     | ❓         | ❓         |
-| macOS    | amd64        | ✅         | ✅         |
-| macOS    | aarch64<sup>†</sup>     | ❓         | ❓         |
-| Windows  | amd64<sup>‡</sup>       | ✅         | ❌         |
-| Windows  | aarch64<sup>†‡</sup>    | ❓         | ❌         |
+|       Target       | Compiles? | Tests Pass? |
+| ------------------ | --------- | ----------- | 
+| linux/amd64        | ✅        | ✅         |
+| linux/aarch64      | ✅        | ✅         |
+| linux/riscv64      | ✅        | ✅         |
+| macos/amd64        | ✅        | ✅         |
+| macos/aarch64      | ✅        | ✅         |
+| windows/amd64      | ✅        | ✅         |
+| windows/aarch64    | ✅        | ❓         |
+| others             | ❓        | ❓         |
 
-<sup>†</sup> CI covering compilation and testing on non-amd64 platforms are planned and currently being worked on. Community help would be greatly appreciated. <br>
-<sup>‡</sup> Windows support is currently unavailable due to the lack of async I/O support from Go (via `wazero`). 
+## Acknowledgments
+
+* We thank [GitHub.com](https://github.com) for providing GitHub Actions runners for all targets below:
+	* `linux/amd64`
+	* `linux/aarch64`*
+	* `linux/riscv64`*
+	* `macos/amd64`
+	* `windows/amd64`
+
+* We thank [FlyCI.net](https://www.flyci.net) for providing GitHub Actions runners for `macos/aarch64`. 
+
+\* Emulated via [docker/setup-qemu-action](https://github.com/docker/setup-qemu-action).
+
+Plus, we are currently actively looking for a CI provider for `windows/aarch64` and others. Please let us know if you would like to help.
