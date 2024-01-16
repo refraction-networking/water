@@ -5,11 +5,12 @@ import (
 	"net"
 	"runtime"
 	"sync"
+	"syscall"
 
 	"github.com/gaukas/water"
 	"github.com/gaukas/water/internal/log"
 	"github.com/gaukas/water/internal/socket"
-	"github.com/gaukas/water/internal/wasm"
+	"github.com/gaukas/water/internal/wasip1"
 	"github.com/tetratelabs/wazero/api"
 )
 
@@ -28,7 +29,7 @@ type TransportModule struct {
 	//  - Records the `callerConnFd`. This will be the fd it used to read/write data from/to
 	//  the caller.
 	//  - Returns `remoteConnFd` to the caller.
-	_dial func(int32) (int32, error) // _dial(callerConnFd i32) -> (remoteConnFd i32)
+	_dial func(int32) (int32, error) // _water_dial(callerConnFd i32) -> (remoteConnFd i32)
 
 	// _accept:
 	//  - Calls to `env.host_accept() -> fd: i32` to accept a network connection and bind it
@@ -37,7 +38,7 @@ type TransportModule struct {
 	//  - Records the `callerConnFd`. This will be the fd it used to read/write data from/to
 	//  the caller.
 	//  - Returns `sourceConnFd` to the caller.
-	_accept func(int32) (int32, error) // _accept(callerConnFd i32) -> (sourceConnFd i32)
+	_accept func(int32) (int32, error) // _water_accept(callerConnFd i32) -> (sourceConnFd i32)
 
 	// _associate:
 	//  - Calls to `env.host_accept() -> fd: i32` to accept a network connection and bind it
@@ -47,7 +48,7 @@ type TransportModule struct {
 	//  of its file descriptors, record the fd for `remoteConnFd`. This will be the fd it used
 	//  to read/write data from/to the remote destination.
 	//  - Returns 0 to the caller or an error code if any of the above steps failed.
-	_associate func() (int32, error) // _associate() -> (err i32)
+	_associate func() (int32, error) // _water_associate() -> (err i32)
 
 	// backgroundWorker is used to replace the deprecated read-write-close model.
 	// We put it in a inlined struct for better code styling.
@@ -60,7 +61,7 @@ type TransportModule struct {
 		// This is a workaround for not being able to call another WASM function until the
 		// current one returns. And apparently this function needs to be called BEFORE the
 		// blocking _worker() function.
-		_cancel_with func(int32) (int32, error) // _cancel_with(fd i32) -> (err i32)
+		_cancel_with func(int32) (int32, error) // _water_cancel_with(fd i32) -> (err i32)
 
 		// _worker provides a blocking function for the WASM module to run a worker thread.
 		// In the worker thread, WASM module should select on all previously pushed sockets
@@ -74,7 +75,7 @@ type TransportModule struct {
 		// The worker thread should exit and return when the cancellation pipe is available
 		// for reading. For the current design, the content read from the pipe does not
 		// include meaningful data.
-		_worker func() (int32, error) // _worker() (err int32)
+		_worker func() (int32, error) // _water_worker() (err int32)
 
 		// a channel used to send errors from the worker thread to the host in a non-blocking
 		// manner. When the worker thread exits, this channel will be closed.
@@ -136,11 +137,7 @@ func (tm *TransportModule) AcceptFor(reverseCallerConn net.Conn) (sourceConn net
 
 	sourceFd, err := tm._accept(callerFd)
 	if err != nil {
-		return nil, fmt.Errorf("water: calling _accept function returned error: %w", err)
-	}
-
-	if sourceFd < 0 {
-		return nil, wasm.WASMErr(sourceFd)
+		return nil, fmt.Errorf("water: calling _accept: %w", err)
 	} else {
 		sourceConn := tm.GetPushedConn(sourceFd)
 		if sourceConn == nil {
@@ -159,12 +156,11 @@ func (tm *TransportModule) Associate() error {
 		return fmt.Errorf("water: WASM module does not export _water_associate")
 	}
 
-	ret, err := tm._associate()
+	_, err := tm._associate()
 	if err != nil {
 		return fmt.Errorf("water: calling _associate function returned error: %w", err)
 	}
-
-	return wasm.WASMErr(ret)
+	return nil
 }
 
 // Worker spins up a worker thread for the WASM module to run a blocking function.
@@ -275,11 +271,7 @@ func (tm *TransportModule) DialFrom(reverseCallerConn net.Conn) (destConn net.Co
 
 	remoteFd, err := tm._dial(callerFd)
 	if err != nil {
-		return nil, fmt.Errorf("water: calling _dial function returned error: %w", err)
-	}
-
-	if remoteFd < 0 {
-		return nil, wasm.WASMErr(remoteFd)
+		return nil, fmt.Errorf("water: calling _dial: %w", err)
 	} else {
 		destConn := tm.GetPushedConn(remoteFd)
 		if destConn == nil {
@@ -295,14 +287,18 @@ func (tm *TransportModule) LinkNetworkInterface(dialer *ManagedDialer, listener 
 		dialerFunc = func() (fd int32) {
 			conn, err := dialer.Dial()
 			if err != nil {
-				return wasm.GENERAL_ERROR
+				log.LErrorf(tm.core.Logger(), "water: dialer.Dial: %v", err)
+				return wasip1.EncodeWATERError(syscall.ENOTCONN) // not connected
 			}
-			fd, _ = tm.PushConn(conn)
+			fd, err = tm.PushConn(conn)
+			if err != nil {
+				log.LErrorf(tm.core.Logger(), "water: PushConn: %v", err)
+			}
 			return fd
 		}
 	} else {
 		dialerFunc = func() (fd int32) {
-			return wasm.INVALID_FUNCTION
+			return wasip1.EncodeWATERError(syscall.ENODEV) // no such device
 		}
 	}
 
@@ -317,14 +313,18 @@ func (tm *TransportModule) LinkNetworkInterface(dialer *ManagedDialer, listener 
 		acceptFunc = func() (fd int32) {
 			conn, err := listener.Accept()
 			if err != nil {
-				return wasm.GENERAL_ERROR
+				log.LErrorf(tm.core.Logger(), "water: listener.Accept: %v", err)
+				return wasip1.EncodeWATERError(syscall.ENOTCONN) // not connected
 			}
-			fd, _ = tm.PushConn(conn)
+			fd, err = tm.PushConn(conn)
+			if err != nil {
+				log.LErrorf(tm.core.Logger(), "water: PushConn: %v", err)
+			}
 			return fd
 		}
 	} else {
 		acceptFunc = func() (fd int32) {
-			return wasm.INVALID_FUNCTION
+			return wasip1.EncodeWATERError(syscall.ENODEV) // no such device
 		}
 	}
 
@@ -406,17 +406,20 @@ func (tm *TransportModule) Initialize() error {
 		tm._init = func() (int32, error) {
 			ret, err := init.Call(coreCtx)
 			if err != nil {
-				return wasm.INVALID_FD, fmt.Errorf("water: calling _water_init function returned error: %w", err)
+				return 0, fmt.Errorf("water: calling _water_init function returned error: %w", err)
 			}
 
-			return api.DecodeI32(ret[0]), nil
+			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
 		}
 	}
 
 	// _dial
 	dial := tm.core.ExportedFunction("_water_dial")
 	if dial == nil {
-		return fmt.Errorf("water: WASM module does not export _water_dial")
+		log.LWarnf(tm.core.Logger(), "water: WASM module does not export _water_dial, water.Dialer will not work.")
+		tm._dial = func(callerFd int32) (int32, error) {
+			return 0, water.ErrUnimplementedDialer
+		}
 	} else {
 		// check signature:
 		//  _water_dial(callerFd i32) -> (remoteFd i32)
@@ -435,17 +438,20 @@ func (tm *TransportModule) Initialize() error {
 		tm._dial = func(callerFd int32) (int32, error) {
 			ret, err := dial.Call(coreCtx, api.EncodeI32(callerFd))
 			if err != nil {
-				return wasm.INVALID_FD, fmt.Errorf("water: calling _water_dial function returned error: %w", err)
+				return 0, fmt.Errorf("water: calling _water_dial function returned error: %w", err)
 			}
 
-			return api.DecodeI32(ret[0]), nil
+			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
 		}
 	}
 
 	// _accept
 	accept := tm.core.ExportedFunction("_water_accept")
 	if accept == nil {
-		return fmt.Errorf("water: WASM module does not export _water_accept")
+		log.LWarnf(tm.core.Logger(), "water: WASM module does not export _water_accept, water.Listener will not work.")
+		tm._accept = func(callerFd int32) (int32, error) {
+			return 0, water.ErrUnimplementedListener
+		}
 	} else {
 		// check signature:
 		//  _water_accept(callerFd i32) -> (sourceFd i32)
@@ -464,17 +470,20 @@ func (tm *TransportModule) Initialize() error {
 		tm._accept = func(callerFd int32) (int32, error) {
 			ret, err := accept.Call(coreCtx, api.EncodeI32(callerFd))
 			if err != nil {
-				return wasm.INVALID_FD, fmt.Errorf("water: calling _water_accept function returned error: %w", err)
+				return 0, fmt.Errorf("water: calling _water_accept function returned error: %w", err)
 			}
 
-			return api.DecodeI32(ret[0]), nil
+			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
 		}
 	}
 
 	// _associate
 	associate := tm.core.ExportedFunction("_water_associate")
 	if associate == nil {
-		return fmt.Errorf("water: WASM module does not export _water_associate")
+		log.LWarnf(tm.core.Logger(), "water: WASM module does not export _water_associate, water.Relay will not work.")
+		tm._associate = func() (int32, error) {
+			return 0, water.ErrUnimplementedRelay
+		}
 	} else {
 		// check signature:
 		//  _water_associate() -> (err i32)
@@ -491,10 +500,10 @@ func (tm *TransportModule) Initialize() error {
 		tm._associate = func() (int32, error) {
 			ret, err := associate.Call(coreCtx)
 			if err != nil {
-				return wasm.INVALID_FD, fmt.Errorf("water: calling _water_associate function returned error: %w", err)
+				return 0, fmt.Errorf("water: calling _water_associate function returned error: %w", err)
 			}
 
-			return api.DecodeI32(ret[0]), nil
+			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
 		}
 	}
 
@@ -546,18 +555,18 @@ func (tm *TransportModule) Initialize() error {
 		_cancel_with: func(fd int32) (int32, error) {
 			ret, err := cancelWith.Call(coreCtx, api.EncodeI32(fd))
 			if err != nil {
-				return wasm.INVALID_FD, fmt.Errorf("water: calling _water_cancel_with function returned error: %w", err)
+				return 0, fmt.Errorf("water: calling _water_cancel_with function returned error: %w", err)
 			}
 
-			return api.DecodeI32(ret[0]), nil
+			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
 		},
 		_worker: func() (int32, error) {
 			ret, err := worker.Call(coreCtx)
 			if err != nil {
-				return wasm.INVALID_FD, fmt.Errorf("water: calling _water_worker function returned error: %w", err)
+				return 0, fmt.Errorf("water: calling _water_worker function returned error: %w", err)
 			}
 
-			return api.DecodeI32(ret[0]), nil
+			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
 		},
 		chanWorkerErr: make(chan error, 4), // at max 1 error would occur, but we can buffer more copies
 		// cancelSocket:  nil,
@@ -567,7 +576,8 @@ func (tm *TransportModule) Initialize() error {
 	if errno, err := tm._init(); err != nil {
 		return fmt.Errorf("water: calling _water_init function returned error: %w", err)
 	} else {
-		return wasm.WASMErr(errno)
+		_, err := wasip1.DecodeWATERError(errno)
+		return err
 	}
 }
 
@@ -596,12 +606,9 @@ func (tm *TransportModule) Worker() error {
 	}
 
 	// pass the fd to the WASM module
-	ret, err := tm.backgroundWorker._cancel_with(cancelPipeFd)
+	_, err = tm.backgroundWorker._cancel_with(cancelPipeFd)
 	if err != nil {
-		return fmt.Errorf("water: calling _water_cancel_with function returned error: %w", err)
-	}
-	if ret != 0 {
-		return fmt.Errorf("water: _water_cancel_with returned error: %w", wasm.WASMErr(ret))
+		return fmt.Errorf("water: calling _water_cancel_with: %w", err)
 	}
 
 	log.LDebugf(tm.core.Logger(), "water: starting worker thread")
@@ -609,7 +616,7 @@ func (tm *TransportModule) Worker() error {
 	// in a goroutine, call _worker
 	go func() {
 		defer close(tm.backgroundWorker.chanWorkerErr)
-		ret, err := tm.backgroundWorker._worker()
+		_, err := tm.backgroundWorker._worker()
 		if err != nil {
 			// multiple copies in case of multiple receivers on the channel
 			tm.backgroundWorker.chanWorkerErr <- err
@@ -617,14 +624,6 @@ func (tm *TransportModule) Worker() error {
 			tm.backgroundWorker.chanWorkerErr <- err
 			tm.backgroundWorker.chanWorkerErr <- err
 			return
-		}
-		if ret != 0 {
-			// multiple copies in case of multiple receivers on the channel
-			tm.backgroundWorker.chanWorkerErr <- wasm.WASMErr(ret)
-			tm.backgroundWorker.chanWorkerErr <- wasm.WASMErr(ret)
-			tm.backgroundWorker.chanWorkerErr <- wasm.WASMErr(ret)
-			tm.backgroundWorker.chanWorkerErr <- wasm.WASMErr(ret)
-			log.LWarnf(tm.core.Logger(), "water: worker thread exited with code %d", ret)
 		} else {
 			log.LDebugf(tm.core.Logger(), "water: worker thread exited with code 0")
 		}
@@ -653,19 +652,21 @@ func (tm *TransportModule) WorkerErrored() <-chan error {
 func (tm *TransportModule) pushConfig() int32 {
 	// get config file
 	if tm.core.Config().TransportModuleConfig == nil {
-		return wasm.NOT_INITIALIZED // Not necessarily a fatal error -- it could be optional to a TransportModule
+		log.LWarnf(tm.core.Logger(), "water: WATM tried to pull config, but none is provided")
+		return wasip1.EncodeWATERError(syscall.EACCES) // No config file provided
 	}
 
 	configFile, err := tm.core.Config().TransportModuleConfig.AsFile()
 	if err == nil {
-		return wasm.INVALID_CONFIG // This is considered a fatal error, as the config file is supplied but cannot be loaded.
+		log.LErrorf(tm.core.Logger(), "water: getting config file failed: %v", err)
+		return wasip1.EncodeWATERError(syscall.EBADF) // Cannot read a provided config file
 	}
 
 	// push config file into WebAssembly instance
 	configFd, err := tm.core.InsertFile(configFile)
 	if err != nil {
 		log.LErrorf(tm.core.Logger(), "water: pushing config file failed: %v", err)
-		return wasm.INVALID_FD
+		return wasip1.EncodeWATERError(syscall.EBADF) // Cannot push a config file
 	}
 
 	return int32(configFd)
@@ -675,7 +676,7 @@ func (tm *TransportModule) pushConfig() int32 {
 func (tm *TransportModule) PushConn(conn net.Conn) (fd int32, err error) {
 	fd, err = tm.core.InsertConn(conn)
 	if err != nil {
-		return wasm.INVALID_FD, err
+		return wasip1.EncodeWATERError(syscall.EBADF), err // Cannot push a connection
 	}
 
 	tm.pushedConnMutex.Lock()
