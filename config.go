@@ -1,6 +1,7 @@
 package water
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net"
@@ -111,7 +112,21 @@ func (c *Config) ModuleConfig() *WazeroModuleConfigFactory {
 	return c.ModuleConfigFactory
 }
 
+// Listen creates a new Listener from the config on the specified network and
+// address.
+//
+// For now, only TCP is supported.
+//
+// Deprecated: use ListenContext instead.
 func (c *Config) Listen(network, address string) (Listener, error) {
+	return c.ListenContext(context.Background(), network, address)
+}
+
+// ListenContext creates a new Listener from the config on the specified network
+// and address with the given context.
+//
+// For now, only TCP is supported.
+func (c *Config) ListenContext(ctx context.Context, network, address string) (Listener, error) {
 	lis, err := net.Listen(network, address)
 	if err != nil {
 		return nil, err
@@ -120,7 +135,7 @@ func (c *Config) Listen(network, address string) (Listener, error) {
 	config := c.Clone()
 	config.NetworkListener = lis
 
-	return NewListener(config)
+	return NewListenerWithContext(ctx, config)
 }
 
 func (c *Config) Logger() *log.Logger {

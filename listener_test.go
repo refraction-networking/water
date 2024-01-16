@@ -1,6 +1,7 @@
 package water_test
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -22,7 +23,7 @@ func ExampleListener() {
 		TransportModuleBin: wasmReverse,
 	}
 
-	waterListener, err := config.Listen("tcp", "localhost:0")
+	waterListener, err := config.ListenContext(context.Background(), "tcp", "localhost:0")
 	if err != nil {
 		panic(err)
 	}

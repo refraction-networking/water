@@ -442,7 +442,10 @@ func BenchmarkDialerOutbound(b *testing.B) {
 // Separate benchmark for the latency measurement will be needed.
 func BenchmarkDialerOutboundReverse(b *testing.B) {
 	// create random TCP listener listening on localhost
-	tcpLis, err := net.ListenTCP("tcp", nil)
+	tcpLis, err := net.ListenTCP("tcp", &net.TCPAddr{
+		IP: net.ParseIP("127.0.0.1"),
+		// Port: 0,
+	})
 	if err != nil {
 		b.Fatal(err)
 	}

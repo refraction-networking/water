@@ -1,6 +1,7 @@
 package water_test
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
@@ -30,7 +31,7 @@ func ExampleRelay() {
 		TransportModuleBin: wasmReverse,
 	}
 
-	waterRelay, err := water.NewRelay(config)
+	waterRelay, err := water.NewRelayWithContext(context.Background(), config)
 	if err != nil {
 		panic(err)
 	}

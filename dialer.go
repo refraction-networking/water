@@ -18,7 +18,13 @@ import (
 //	             +----------------+
 //	                   Dialer
 type Dialer interface {
+	// Dial dials the remote network address and returns a net.Conn.
+	//
+	// Deprecated: use DialContext instead.
 	Dial(network, address string) (Conn, error)
+
+	// DialContext dials the remote network address with the given context
+	// and returns a net.Conn.
 	DialContext(ctx context.Context, network, address string) (Conn, error)
 
 	mustEmbedUnimplementedDialer()

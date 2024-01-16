@@ -2,6 +2,7 @@ package v0_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"fmt"
 	"net"
@@ -26,7 +27,7 @@ func ExampleListener() {
 		NetworkListener:    wrappedTcpListener,
 	}
 
-	waterListener, err := v0.NewListener(config)
+	waterListener, err := v0.NewListenerWithContext(context.Background(), config)
 	if err != nil {
 		panic(fmt.Sprintf("failed to listen: %v", err))
 	}
@@ -87,9 +88,9 @@ func testListenerBadAddr(t *testing.T) {
 		TransportModuleBin: wasmPlain,
 	}
 
-	_, err := config.Listen("tcp", "256.267.278.289:2023")
+	_, err := config.ListenContext(context.Background(), "tcp", "256.267.278.289:2023")
 	if err == nil {
-		t.Fatal("config.Listen should fail on bad address")
+		t.Fatal("config.ListenContext should fail on bad address")
 	}
 }
 
@@ -99,7 +100,7 @@ func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 		TransportModuleBin: wasmPlain,
 	}
 
-	testLis, err := config.Listen("tcp", "localhost:0")
+	testLis, err := config.ListenContext(context.Background(), "tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +233,7 @@ func testListenerReverse(t *testing.T) { // skipcq: GO-R1005
 		TransportModuleBin: wasmReverse,
 	}
 
-	testLis, err := config.Listen("tcp", "localhost:0")
+	testLis, err := config.ListenContext(context.Background(), "tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +384,7 @@ func BenchmarkInboundListener(b *testing.B) {
 		TransportModuleBin: wasmPlain,
 	}
 
-	testLis, err := config.Listen("tcp", "localhost:0")
+	testLis, err := config.ListenContext(context.Background(), "tcp", "localhost:0")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -431,7 +432,7 @@ func BenchmarkInboundListenerReverse(b *testing.B) {
 		TransportModuleBin: wasmReverse,
 	}
 
-	testLis, err := config.Listen("tcp", "localhost:0")
+	testLis, err := config.ListenContext(context.Background(), "tcp", "localhost:0")
 	if err != nil {
 		b.Fatal(err)
 	}

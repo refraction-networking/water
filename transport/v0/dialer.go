@@ -44,7 +44,7 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (conn
 	go func() {
 		defer dialReady()
 		var core water.Core
-		core, err = water.NewCore(d.config)
+		core, err = water.NewCoreWithContext(ctx, d.config)
 		if err != nil {
 			return
 		}

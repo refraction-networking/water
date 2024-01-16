@@ -1,6 +1,7 @@
 package v0
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync/atomic"
@@ -9,7 +10,7 @@ import (
 )
 
 func init() {
-	err := water.RegisterListener("_water_v0", NewListener)
+	err := water.RegisterListener("_water_v0", NewListenerWithContext)
 	if err != nil {
 		panic(err)
 	}
@@ -19,15 +20,27 @@ func init() {
 type Listener struct {
 	config *water.Config
 	closed *atomic.Bool
+	ctx    context.Context
 
 	water.UnimplementedListener // embedded to ensure forward compatibility
 }
 
 // NewListener creates a new Listener.
+//
+// Deprecated: use NewListenerWithContext instead.
 func NewListener(c *water.Config) (water.Listener, error) {
 	return &Listener{
 		config: c.Clone(),
 		closed: new(atomic.Bool),
+	}, nil
+}
+
+// NewListenerWithContext creates a new Listener with the given context.
+func NewListenerWithContext(ctx context.Context, c *water.Config) (water.Listener, error) {
+	return &Listener{
+		config: c.Clone(),
+		closed: new(atomic.Bool),
+		ctx:    ctx,
 	}, nil
 }
 
@@ -73,7 +86,7 @@ func (l *Listener) AcceptWATER() (water.Conn, error) {
 
 	var core water.Core
 	var err error
-	core, err = water.NewCore(l.config)
+	core, err = water.NewCoreWithContext(l.ctx, l.config)
 	if err != nil {
 		return nil, err
 	}

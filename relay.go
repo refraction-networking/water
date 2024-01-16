@@ -1,6 +1,7 @@
 package water
 
 import (
+	"context"
 	"errors"
 	"net"
 )
@@ -43,7 +44,7 @@ type Relay interface {
 	mustEmbedUnimplementedRelay()
 }
 
-type newRelayFunc func(*Config) (Relay, error)
+type newRelayFunc func(context.Context, *Config) (Relay, error)
 
 var (
 	knownRelayVersions = make(map[string]newRelayFunc)
@@ -101,7 +102,18 @@ func RegisterRelay(version string, relay newRelayFunc) error {
 //
 // It automatically detects the version of the WebAssembly Transport
 // Module specified in the config.
+//
+// Deprecated: use NewRelayWithContext instead.
 func NewRelay(c *Config) (Relay, error) {
+	return NewRelayWithContext(context.Background(), c)
+}
+
+// NewRelayWithContext creates a new Relay from the config with
+// the given context.
+//
+// It automatically detects the version of the WebAssembly Transport
+// Module specified in the config.
+func NewRelayWithContext(ctx context.Context, c *Config) (Relay, error) {
 	core, err := NewCore(c)
 	if err != nil {
 		return nil, err
@@ -114,7 +126,7 @@ func NewRelay(c *Config) (Relay, error) {
 	// in a more organized way.
 	for exportName := range core.Exports() {
 		if f, ok := knownRelayVersions[exportName]; ok {
-			return f(c)
+			return f(ctx, c)
 		}
 	}
 

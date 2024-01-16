@@ -1,6 +1,7 @@
 package v0
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync/atomic"
@@ -9,7 +10,7 @@ import (
 )
 
 func init() {
-	err := water.RegisterRelay("_water_v0", NewRelay)
+	err := water.RegisterRelay("_water_v0", NewRelayWithContext)
 	if err != nil {
 		panic(err)
 	}
@@ -18,6 +19,7 @@ func init() {
 // Relay implements water.Relay utilizing Water WATM API v0.
 type Relay struct {
 	config  *water.Config
+	ctx     context.Context
 	running *atomic.Bool
 
 	dialNetwork, dialAddress string
@@ -26,10 +28,20 @@ type Relay struct {
 }
 
 // NewRelay creates a relay with the given Config without starting
-// it. To start the relay, call Start().
+// it. To start the relay, call [RelayTo] or [ListenAndRelayTo].
+//
+// Deprecated: use NewRelayWithContext instead.
 func NewRelay(c *water.Config) (water.Relay, error) {
+	return NewRelayWithContext(context.Background(), c)
+}
+
+// NewRelayWithContext creates a relay with the given Config and
+// context without starting it. To start the relay, call [RelayTo]
+// or [ListenAndRelayTo].
+func NewRelayWithContext(ctx context.Context, c *water.Config) (water.Relay, error) {
 	return &Relay{
 		config:  c.Clone(),
+		ctx:     ctx,
 		running: new(atomic.Bool),
 	}, nil
 }
@@ -50,7 +62,7 @@ func (r *Relay) RelayTo(network, address string) error {
 	var core water.Core
 	var err error
 	for r.running.Load() {
-		core, err = water.NewCore(r.config)
+		core, err = water.NewCoreWithContext(r.ctx, r.config)
 		if err != nil {
 			return err
 		}
@@ -92,7 +104,7 @@ func (r *Relay) ListenAndRelayTo(lnetwork, laddress, rnetwork, raddress string) 
 
 	var core water.Core
 	for r.running.Load() {
-		core, err = water.NewCore(r.config)
+		core, err = water.NewCoreWithContext(r.ctx, r.config)
 		if err != nil {
 			return err
 		}
