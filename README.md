@@ -72,7 +72,7 @@ connection.
 	}
 
 	dialer, _ := water.NewDialer(config)
-	conn, _ := dialer.Dial("tcp", remoteAddr)
+	conn, _ := dialer.DialContext(context.Background(),"tcp", remoteAddr)
 	// ...
 ```
 
@@ -97,7 +97,7 @@ managing the tunnel obfuscation once a connection is established.
 		TransportModuleBin: wasm,
 	}
 
-	lis, _ := config.Listen("tcp", localAddr)
+	lis, _ := config.ListenContext(context.Background(), "tcp", localAddr)
 	defer lis.Close()
 	log.Printf("Listening on %s", lis.Addr().String())
 
@@ -127,7 +127,7 @@ to tunnel traffic.
 		TransportModuleBin: wasm,
 	}
 
-	relay, _ := water.NewRelay(config)
+	relay, _ := water.NewRelayWithContext(context.Background(), config)
 
 	relay.ListenAndRelayTo("tcp", localAddr, "tcp", remoteAddr) // blocking
 ```

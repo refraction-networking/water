@@ -2,6 +2,7 @@ package v0_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"fmt"
 	"net"
@@ -31,7 +32,7 @@ func ExampleDialer() {
 	}
 	defer tcpListener.Close() // skipcq: GO-S2307
 
-	waterConn, err := waterDialer.Dial("tcp", tcpListener.Addr().String())
+	waterConn, err := waterDialer.DialContext(context.Background(), "tcp", tcpListener.Addr().String())
 	if err != nil {
 		panic(err)
 	}
@@ -91,7 +92,7 @@ func testDialerBadAddr(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = dialer.Dial("tcp", "256.267.278.289:2023")
+	_, err = dialer.DialContext(context.Background(), "tcp", "256.267.278.289:2023")
 	if err == nil {
 		t.Fatal("dialer.Dial should fail")
 	}
@@ -113,7 +114,7 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 		t.Fatal(err)
 	}
 
-	conn, err := dialer.Dial("tcp", tcpLis.Addr().String())
+	conn, err := dialer.DialContext(context.Background(), "tcp", tcpLis.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +250,7 @@ func testDialerReverse(t *testing.T) { // skipcq: GO-R1005
 		t.Fatal(err)
 	}
 
-	conn, err := dialer.Dial("tcp", tcpLis.Addr().String())
+	conn, err := dialer.DialContext(context.Background(), "tcp", tcpLis.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,7 +405,7 @@ func BenchmarkDialerOutbound(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	waterConn, err := dialer.Dial("tcp", tcpLis.Addr().String())
+	waterConn, err := dialer.DialContext(context.Background(), "tcp", tcpLis.Addr().String())
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -442,7 +443,10 @@ func BenchmarkDialerOutbound(b *testing.B) {
 // Separate benchmark for the latency measurement will be needed.
 func BenchmarkDialerOutboundReverse(b *testing.B) {
 	// create random TCP listener listening on localhost
-	tcpLis, err := net.ListenTCP("tcp", nil)
+	tcpLis, err := net.ListenTCP("tcp", &net.TCPAddr{
+		IP: net.ParseIP("127.0.0.1"),
+		// Port: 0,
+	})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -457,7 +461,7 @@ func BenchmarkDialerOutboundReverse(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	waterConn, err := dialer.Dial("tcp", tcpLis.Addr().String())
+	waterConn, err := dialer.DialContext(context.Background(), "tcp", tcpLis.Addr().String())
 	if err != nil {
 		b.Fatal(err)
 	}

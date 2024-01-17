@@ -1,6 +1,7 @@
 package water
 
 import (
+	"context"
 	"errors"
 	"net"
 )
@@ -35,7 +36,7 @@ type Listener interface {
 	mustEmbedUnimplementedListener()
 }
 
-type newListenerFunc func(*Config) (Listener, error)
+type newListenerFunc func(context.Context, *Config) (Listener, error)
 
 var (
 	knownListenerVersions = make(map[string]newListenerFunc)
@@ -90,7 +91,17 @@ func RegisterListener(version string, listener newListenerFunc) error {
 //
 // It automatically detects the version of the WebAssembly Transport
 // Module specified in the config.
+//
+// Deprecated: use NewListenerWithContext instead.
 func NewListener(c *Config) (Listener, error) {
+	return NewListenerWithContext(context.Background(), c)
+}
+
+// NewListenerWithContext creates a new Listener from the config with
+// the given context.
+//
+// It automatically detects the version of the WebAssembly Transport
+func NewListenerWithContext(ctx context.Context, c *Config) (Listener, error) {
 	core, err := NewCore(c)
 	if err != nil {
 		return nil, err
@@ -103,7 +114,7 @@ func NewListener(c *Config) (Listener, error) {
 	// in a more organized way.
 	for exportName := range core.Exports() {
 		if f, ok := knownListenerVersions[exportName]; ok {
-			return f(c)
+			return f(ctx, c)
 		}
 	}
 

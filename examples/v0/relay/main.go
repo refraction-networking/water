@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -9,14 +11,16 @@ import (
 	_ "github.com/gaukas/water/transport/v0"
 )
 
-func main() {
-	if len(os.Args) != 3 {
-		panic("usage: relay <local_addr> <remote_addr>")
-	}
-	var localAddr string = os.Args[1]
-	var remoteAddr string = os.Args[2]
+var (
+	localAddr  = flag.String("laddr", "", "local address to listen on")
+	remoteAddr = flag.String("raddr", "", "remote address to dial")
+	wasmPath   = flag.String("wasm", "", "path to wasm file")
+)
 
-	wasm, err := os.ReadFile("./examples/v0/plain/plain.wasm")
+func main() {
+	flag.Parse()
+
+	wasm, err := os.ReadFile(*wasmPath)
 	if err != nil {
 		panic(fmt.Sprintf("failed to read wasm file: %v", err))
 	}
@@ -31,12 +35,12 @@ func main() {
 	config.ModuleConfig().InheritStdout()
 	config.ModuleConfig().InheritStderr()
 
-	relay, err := water.NewRelay(config)
+	relay, err := water.NewRelayWithContext(context.Background(), config)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create dialer: %v", err))
 	}
 
-	err = relay.ListenAndRelayTo("tcp", localAddr, "tcp", remoteAddr)
+	err = relay.ListenAndRelayTo("tcp", *localAddr, "tcp", *remoteAddr)
 	if err != nil {
 		panic(fmt.Sprintf("failed to dial: %v", err))
 	}

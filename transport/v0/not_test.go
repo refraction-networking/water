@@ -47,11 +47,9 @@ func benchmarkUnidirectionalStream(b *testing.B, wrConn, rdConn net.Conn) {
 	}()
 
 	runtime.GC()
-	time.Sleep(10 * time.Millisecond)
 	runtime.GC()
-	time.Sleep(10 * time.Millisecond)
 	runtime.GC()
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(100 * time.Microsecond)
 
 	b.SetBytes(1024)
 	b.StartTimer()
@@ -67,7 +65,6 @@ func benchmarkUnidirectionalStream(b *testing.B, wrConn, rdConn net.Conn) {
 		if err != nil {
 			b.Fatalf("rand.Read error: %s", err)
 		}
-		// time.Sleep(10 * time.Nanosecond) // simulate some other work to prepare for the next write
 	}
 	wg2.Wait()
 	b.StopTimer()
@@ -75,9 +72,6 @@ func benchmarkUnidirectionalStream(b *testing.B, wrConn, rdConn net.Conn) {
 	if peerRecvErr != nil {
 		b.Fatal(peerRecvErr)
 	}
-
-	// runtime.GC()
-	// time.Sleep(10 * time.Millisecond)
 }
 
 func sanityCheckConn(wrConn, rdConn net.Conn, writeMsg, expectRead []byte) error {

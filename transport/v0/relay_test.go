@@ -2,6 +2,7 @@ package v0_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"fmt"
 	"net"
@@ -27,7 +28,7 @@ func ExampleRelay() {
 		TransportModuleBin: wasmReverse,
 	}
 
-	waterRelay, err := v0.NewRelay(config)
+	waterRelay, err := v0.NewRelayWithContext(context.Background(), config)
 	if err != nil {
 		panic(err)
 	}
@@ -108,7 +109,7 @@ func testRelayPlain(t *testing.T) { // skipcq: GO-R1005
 	config := &water.Config{
 		TransportModuleBin: wasmPlain,
 	}
-	relay, err := v0.NewRelay(config)
+	relay, err := v0.NewRelayWithContext(context.Background(), config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +246,7 @@ func testRelayReverse(t *testing.T) { // skipcq: GO-R1005
 	config := &water.Config{
 		TransportModuleBin: wasmReverse,
 	}
-	relay, err := water.NewRelay(config)
+	relay, err := water.NewRelayWithContext(context.Background(), config)
 	if err != nil {
 		t.Fatal(err)
 	}
