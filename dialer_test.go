@@ -1,6 +1,7 @@
 package water_test
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -34,7 +35,7 @@ func ExampleDialer() {
 	}
 	defer tcpListener.Close() // skipcq: GO-S2307
 
-	waterConn, err := waterDialer.Dial("tcp", tcpListener.Addr().String())
+	waterConn, err := waterDialer.DialContext(context.Background(), "tcp", tcpListener.Addr().String())
 	if err != nil {
 		panic(err)
 	}
