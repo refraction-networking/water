@@ -166,7 +166,7 @@ func NewCoreWithContext(ctx context.Context, config *Config) (Core, error) {
 	}
 
 	c.ctx = ctx
-	c.runtime = wazero.NewRuntime(ctx)
+	c.runtime = wazero.NewRuntimeWithConfig(ctx, config.RuntimeConfigFactory.GetConfig())
 
 	if c.module, err = c.runtime.CompileModule(ctx, c.config.WATMBinOrPanic()); err != nil {
 		return nil, fmt.Errorf("water: (*Runtime).CompileModule returned error: %w", err)
@@ -278,14 +278,9 @@ func (c *core) ImportFunction(module, name string, f any) error {
 }
 
 // Instantiate implements Core.
-func (c *core) Instantiate() error {
+func (c *core) Instantiate() (err error) {
 	if c.instance != nil {
 		return fmt.Errorf("water: double instantiation is not allowed")
-	}
-
-	moduleConfig, err := c.config.ModuleConfigFactory.GetConfig()
-	if err != nil {
-		return fmt.Errorf("water: (*RuntimeConfigFactory).GetConfig returned error: %w", err)
 	}
 
 	// Instantiate the imported functions
@@ -295,7 +290,10 @@ func (c *core) Instantiate() error {
 		}
 	}
 
-	if c.instance, err = c.runtime.InstantiateModule(c.ctx, c.module, moduleConfig); err != nil {
+	if c.instance, err = c.runtime.InstantiateModule(
+		c.ctx,
+		c.module,
+		c.config.ModuleConfigFactory.GetConfig()); err != nil {
 		return fmt.Errorf("water: (*Runtime).InstantiateWithConfig returned error: %w", err)
 	}
 
