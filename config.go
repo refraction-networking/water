@@ -48,6 +48,8 @@ type Config struct {
 	// be created and returned.
 	ModuleConfigFactory *WazeroModuleConfigFactory
 
+	RuntimeConfigFactory *WazeroRuntimeConfigFactory
+
 	OverrideLogger *log.Logger // essentially a *slog.Logger, currently using an alias to flatten the version discrepancy
 }
 

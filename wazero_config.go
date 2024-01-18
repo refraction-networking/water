@@ -1,6 +1,7 @@
 package water
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -33,12 +34,12 @@ func (wmcf *WazeroModuleConfigFactory) Clone() *WazeroModuleConfigFactory {
 }
 
 // GetConfig returns the latest wazero.ModuleConfig.
-func (wmcf *WazeroModuleConfigFactory) GetConfig() (wazero.ModuleConfig, error) {
+func (wmcf *WazeroModuleConfigFactory) GetConfig() wazero.ModuleConfig {
 	if wmcf == nil {
-		return wazero.NewModuleConfig(), nil
+		return wazero.NewModuleConfig()
 	}
 
-	return wmcf.moduleConfig.WithFSConfig(wmcf.fsconfig), nil
+	return wmcf.moduleConfig.WithFSConfig(wmcf.fsconfig)
 }
 
 // SetArgv sets the arguments for the WebAssembly module.
@@ -114,3 +115,59 @@ func (wmcf *WazeroModuleConfigFactory) SetPreopenDir(path string, guestPath stri
 
 // TODO: consider adding SetPreopenReadonlyDir
 // TODO: consider adding SetPreopenFS
+
+// WazeroRuntimeConfigFactory is used to spawn wazero.RuntimeConfig.
+type WazeroRuntimeConfigFactory struct {
+	runtimeConfig    wazero.RuntimeConfig
+	compilationCache wazero.CompilationCache
+}
+
+// NewWazeroRuntimeConfigFactory creates a new WazeroRuntimeConfigFactory.
+func NewWazeroRuntimeConfigFactory() *WazeroRuntimeConfigFactory {
+	return &WazeroRuntimeConfigFactory{
+		runtimeConfig:    wazero.NewRuntimeConfig(),
+		compilationCache: nil,
+	}
+}
+
+func (wrcf *WazeroRuntimeConfigFactory) Clone() *WazeroRuntimeConfigFactory {
+	return &WazeroRuntimeConfigFactory{
+		runtimeConfig:    wrcf.runtimeConfig,
+		compilationCache: wrcf.compilationCache,
+	}
+}
+
+// GetConfig returns the latest wazero.RuntimeConfig.
+func (wrcf *WazeroRuntimeConfigFactory) GetConfig() wazero.RuntimeConfig {
+	if wrcf == nil {
+		wrcf = NewWazeroRuntimeConfigFactory()
+	}
+
+	if wrcf.compilationCache != nil {
+		return wrcf.runtimeConfig.WithCompilationCache(wrcf.compilationCache)
+	} else {
+		return wrcf.runtimeConfig.WithCompilationCache(getGlobalCompilationCache())
+	}
+}
+
+// SetCompilationCache sets the CompilationCache for the WebAssembly module.
+func (wrcf *WazeroRuntimeConfigFactory) SetCompilationCache(cache wazero.CompilationCache) {
+	wrcf.compilationCache = cache
+}
+
+var globalCompilationCache wazero.CompilationCache
+
+func getGlobalCompilationCache() wazero.CompilationCache {
+	if globalCompilationCache == nil {
+		var err error
+		globalCompilationCache, err = wazero.NewCompilationCacheWithDir(fmt.Sprintf("%s%c%s", os.TempDir(), os.PathSeparator, "waterwazerocache"))
+		if err != nil {
+			panic(err)
+		}
+	}
+	return globalCompilationCache
+}
+
+func SetGlobalCompilationCache(cache wazero.CompilationCache) {
+	globalCompilationCache = cache
+}
