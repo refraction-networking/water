@@ -1,5 +1,5 @@
-github.com/gaukas/wazero v1.6.1-w h1:xgvoj44k4I9IpJhklFUwkK41pusljULSHSQQaiyaXww=
-github.com/gaukas/wazero v1.6.1-w/go.mod h1:0U0G41+ochRKoPKCJlh0jMg1CHkyfK8kDqiirMmKY8A=
+github.com/gaukas/wazero v1.6.4-w h1:HgAulM1u4jdkMJMn5GFuA/2CB/IMmsEFQTo2EUxvzgI=
+github.com/gaukas/wazero v1.6.4-w/go.mod h1:0U0G41+ochRKoPKCJlh0jMg1CHkyfK8kDqiirMmKY8A=
 github.com/google/go-cmp v0.5.8 h1:e6P7q2lk1O+qJJb4BtCQXlK8vWEO8V1ZeuEdJNOqZyg=
 golang.org/x/exp v0.0.0-20231226003508-02704c960a9b h1:kLiC65FbiHWFAOu+lxwNPujcsl8VYyTYYEZnsOO1WK4=
 golang.org/x/exp v0.0.0-20231226003508-02704c960a9b/go.mod h1:iRJReGqOEeBhDZGkGbynYwcHlctCvnjTYIamk7uXpHI=
