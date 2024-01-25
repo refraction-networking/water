@@ -11,7 +11,7 @@
         lightweight, allowing for rapidly deployable pluggable transports. While other pluggable
         transport implementations require a fresh client deployment (and app-store review) to update
         their protocol WATER allows <b><u>dynamic delivery of new transports</u></b> in real time
-        over the network.<br />
+        over the network or out-of-band.<br />
         <br />
     </div>
     <div style="margin-left: 80%; height: 150px;"> 
@@ -19,28 +19,33 @@
     </div>
 </div>
 
-The Rust implementation of the runtime library and information about writing, buiding, and sharing WebAssembly Transport Modules(WATM) can be found in [water-rs](https://github.com/erikziyunchi/water-rs). 
+To build a WATM in Go, please refer to [watm](https://github.com/gaukas/watm) for examples and helper libraries interfacing Pluggable Transports-like interfaces. Official Go compiler is currently not supported ([watm#4](https://github.com/gaukas/watm/issues/4)).
 
-To build a WATM in Go, please refer to [watm](https://github.com/gaukas/watm) for examples and helper libraries interfacing Pluggable Transports-like interfaces. Please note: at the moment, only TinyGo is supported. Go support will be added once Go supports `//go:wasmexport` directive just like how they supported `//go:wasmimport` since Go 1.21.
+You can contact one of developers personally via gaukas.wang@colorado.edu, or simply [opening an issue](https://github.com/gaukas/water/issues/new). 
 
-### Citation Information
+The Rust implementation of the runtime library and information about writing, building, and using WebAssembly Transport Modules(WATM) from Rust can be found in [water-rs](https://github.com/erikziyunchi/water-rs). 
 
-If you quoted or used our work, please cite our paper [Just add WATER: WebAssembly-based Circumvention Transports](https://arxiv.org/pdf/2312.00163.pdf) in your work.
+### Cite our work
+
+If you quoted or used our work in your own project/paper/research, please cite our paper [Just add WATER: WebAssembly-based Circumvention Transports](https://arxiv.org/pdf/2312.00163.pdf).
 
 <details>
   <summary>BibTeX</summary>
     
   ```bibtex
-  @misc{chi2023just,
-    title={Just add WATER: WebAssembly-based Circumvention Transports}, 
-    author={Erik Chi and Gaukas Wang and J. Alex Halderman and Eric Wustrow and Jack Wampler},
-    year={2023},
-    eprint={2312.00163},
-    archivePrefix={arXiv},
-    primaryClass={cs.CR}
+  @inproceedings{water-foci24,
+	  author = {Chi, Erik and Wang, Gaukas and Halderman, J. Alex and Wustrow, Eric and Wampler, Jack},
+	  year = {2024},
+	  month = {02},
+	  title = {Just add {WATER}: {WebAssembly}-based Circumvention Transports},
+	  address = {Virtual Event},
+	  series = {FOCI '24},
+	  booktitle = {Free and Open Communications on the Internet},
   }
   ```
 </details>
+
+**Update**: our paper has been accepted by FOCI and will appear at [FOCI 2024](https://foci.community/foci24.html) on Feb 19, 2024! 
 
 ## Be Water
 
@@ -56,6 +61,32 @@ This repo contains a Go package `water`, which implements the runtime library us
 
 <!-- ## API  -->
 Based on **WASI Snapshot Preview 1** (_wasip1_), currently W.A.T.E.R. provides a set of `net`-like APIs via `Dialer`, `Listener` and `Relay`.
+
+## Versioning
+
+W.A.T.E.R. is designed to be future-proof with the automated multi-version WebAssembly Transport Module(WATM) support. In order to minimize the size of compiled application binaries importing `water`, the support for each WATM version is implemented in separate sub-packages and by default none will be enabled. The developer MUST manually enable each version to be supported by importing the corresponding package: 
+
+```go
+import (
+	// ...
+
+	_ "github.com/gaukas/water/transport/v0"
+
+	// ...
+)
+```
+
+Otherwise, it is possible that the W.A.T.E.R. runtime cannot determine the version of the WATM and therefore fail to select the corresponding runtime: 
+
+```go
+panic: failed to listen: water: listener version not found
+```
+
+### Customizable Version
+
+_TODO: add documentations for customizable WATM version._
+
+## Components
 
 ### Dialer
 
@@ -134,28 +165,6 @@ to tunnel traffic.
 	relay.ListenAndRelayTo("tcp", localAddr, "tcp", remoteAddr) // blocking
 ```
 
-## Versioning
-
-W.A.T.E.R. is designed to support multiple versions of the WebAssembly Transport Module(WATM) specification at once. The current maximum supported version is `v0`. 
-
-To minimize the size of compiled application binaries importing the `water` package, the support for each version is implemented in separate sub-packages. Developers should import the sub-package that matches the version of the WATM they expect to use.
-
-```go
-import (
-	// ...
-
-	_ "github.com/gaukas/water/transport/v0"
-
-	// ...
-)
-```
-
-Otherwise, it is possible that the W.A.T.E.R. runtime cannot determine the version of the WATM and therefore fail to select the corresponding runtime: 
-
-```go
-panic: failed to listen: water: listener version not found
-```
-
 ## Example
 
 See [examples](./examples) for example usecase of W.A.T.E.R. API, including `Dialer`, `Listener` and `Relay`.
@@ -185,8 +194,8 @@ Currently, it supports the following platforms:
 	* `macos/amd64`
 	* `windows/amd64`
 
-* We thank [FlyCI.net](https://www.flyci.net) for providing GitHub Actions runners for `macos/aarch64`. 
-
 \* Emulated via [docker/setup-qemu-action](https://github.com/docker/setup-qemu-action).
 
-Plus, we are currently actively looking for a CI provider for `windows/aarch64` and others. Please let us know if you would like to help.
+* We thank [FlyCI.net](https://www.flyci.net) for providing GitHub Actions runners for `macos/aarch64` (Apple M1)
+
+Looking for help: We are currently actively looking for a CI provider for `windows/aarch64` and more platform. Please reach out and let us know if you would like to help.
