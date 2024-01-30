@@ -36,7 +36,12 @@ func main() {
 	config.ModuleConfig().InheritStdout()
 	config.ModuleConfig().InheritStderr()
 
-	lis, err := config.ListenContext(context.Background(), "tcp", *localAddr)
+	ctx := context.Background()
+	// // optional: enable wazero logging
+	// ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{},
+	// 	logging.NewHostLoggingListenerFactory(os.Stderr, logging.LogScopeFilesystem|logging.LogScopePoll|logging.LogScopeSock))
+
+	lis, err := config.ListenContext(ctx, "tcp", *localAddr)
 	if err != nil {
 		panic(fmt.Sprintf("failed to listen: %v", err))
 	}
