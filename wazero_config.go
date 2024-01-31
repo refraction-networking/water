@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 
+	rand "crypto/rand"
+
 	"github.com/tetratelabs/wazero"
 )
 
@@ -17,7 +19,7 @@ type WazeroModuleConfigFactory struct {
 // NewWazeroModuleConfigFactory creates a new WazeroModuleConfigFactory.
 func NewWazeroModuleConfigFactory() *WazeroModuleConfigFactory {
 	return &WazeroModuleConfigFactory{
-		moduleConfig: wazero.NewModuleConfig(),
+		moduleConfig: wazero.NewModuleConfig().WithSysWalltime().WithSysNanotime().WithSysNanosleep().WithRandSource(rand.Reader),
 		fsconfig:     wazero.NewFSConfig(),
 	}
 }
@@ -36,7 +38,7 @@ func (wmcf *WazeroModuleConfigFactory) Clone() *WazeroModuleConfigFactory {
 // GetConfig returns the latest wazero.ModuleConfig.
 func (wmcf *WazeroModuleConfigFactory) GetConfig() wazero.ModuleConfig {
 	if wmcf == nil {
-		return wazero.NewModuleConfig()
+		return wazero.NewModuleConfig().WithSysWalltime().WithSysNanotime().WithSysNanosleep().WithRandSource(rand.Reader)
 	}
 
 	return wmcf.moduleConfig.WithFSConfig(wmcf.fsconfig)
