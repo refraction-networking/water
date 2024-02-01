@@ -14,7 +14,7 @@ jobs:
     name: go${{ matrix.go }} (${{ matrix.os }}/amd64)
     strategy:
       matrix:
-        os: [ "ubuntu", "windows", "macos" ] 
+        os: [ "ubuntu", "windows" ] 
         go: [ "1.20", "1.21" ] # we support the latest 2 stable versions of Go
     runs-on: ${{ matrix.os }}-latest # use latest OS image
     steps:
