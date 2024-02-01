@@ -114,6 +114,14 @@ func (c *Config) ModuleConfig() *WazeroModuleConfigFactory {
 	return c.ModuleConfigFactory
 }
 
+func (c *Config) RuntimeConfig() *WazeroRuntimeConfigFactory {
+	if c.RuntimeConfigFactory == nil {
+		c.RuntimeConfigFactory = NewWazeroRuntimeConfigFactory()
+	}
+
+	return c.RuntimeConfigFactory
+}
+
 // Listen creates a new Listener from the config on the specified network and
 // address.
 //

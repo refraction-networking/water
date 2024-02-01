@@ -38,7 +38,7 @@ func (wmcf *WazeroModuleConfigFactory) Clone() *WazeroModuleConfigFactory {
 // GetConfig returns the latest wazero.ModuleConfig.
 func (wmcf *WazeroModuleConfigFactory) GetConfig() wazero.ModuleConfig {
 	if wmcf == nil {
-		return wazero.NewModuleConfig().WithSysWalltime().WithSysNanotime().WithSysNanosleep().WithRandSource(rand.Reader)
+		panic("water: GetConfig: wmcf is nil")
 	}
 
 	return wmcf.moduleConfig.WithFSConfig(wmcf.fsconfig)
@@ -142,7 +142,7 @@ func (wrcf *WazeroRuntimeConfigFactory) Clone() *WazeroRuntimeConfigFactory {
 // GetConfig returns the latest wazero.RuntimeConfig.
 func (wrcf *WazeroRuntimeConfigFactory) GetConfig() wazero.RuntimeConfig {
 	if wrcf == nil {
-		wrcf = NewWazeroRuntimeConfigFactory()
+		panic("water: GetConfig: wrcf is nil")
 	}
 
 	if wrcf.compilationCache != nil {
@@ -152,7 +152,18 @@ func (wrcf *WazeroRuntimeConfigFactory) GetConfig() wazero.RuntimeConfig {
 	}
 }
 
+func (wrcf *WazeroRuntimeConfigFactory) Interpreter() {
+	wrcf.runtimeConfig = wazero.NewRuntimeConfigInterpreter()
+}
+
+func (wrcf *WazeroRuntimeConfigFactory) Compiler() {
+	wrcf.runtimeConfig = wazero.NewRuntimeConfigCompiler()
+}
+
 // SetCompilationCache sets the CompilationCache for the WebAssembly module.
+//
+// Calling this function will not update the global CompilationCache and therefore
+// disable the automatic sharing of the cache between multiple WebAssembly modules.
 func (wrcf *WazeroRuntimeConfigFactory) SetCompilationCache(cache wazero.CompilationCache) {
 	wrcf.compilationCache = cache
 }
@@ -170,6 +181,9 @@ func getGlobalCompilationCache() wazero.CompilationCache {
 	return globalCompilationCache
 }
 
+// SetGlobalCompilationCache sets the global CompilationCache for the WebAssembly
+// runtime. This is useful for sharing the cache between multiple WebAssembly
+// modules and should be called before any WebAssembly module is instantiated.
 func SetGlobalCompilationCache(cache wazero.CompilationCache) {
 	globalCompilationCache = cache
 }
