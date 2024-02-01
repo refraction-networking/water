@@ -23,8 +23,9 @@ func ExampleListener() {
 
 	// start using W.A.T.E.R. API below this line, have fun!
 	config := &water.Config{
-		TransportModuleBin: wasmReverse,
-		NetworkListener:    wrappedTcpListener,
+		TransportModuleBin:  wasmReverse,
+		NetworkListener:     wrappedTcpListener,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 
 	waterListener, err := v0.NewListenerWithContext(context.Background(), config)

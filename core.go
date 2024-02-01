@@ -166,7 +166,7 @@ func NewCoreWithContext(ctx context.Context, config *Config) (Core, error) {
 	}
 
 	c.ctx = ctx
-	c.runtime = wazero.NewRuntimeWithConfig(ctx, config.RuntimeConfigFactory.GetConfig())
+	c.runtime = wazero.NewRuntimeWithConfig(ctx, config.RuntimeConfig().GetConfig())
 
 	if c.module, err = c.runtime.CompileModule(ctx, c.config.WATMBinOrPanic()); err != nil {
 		return nil, fmt.Errorf("water: (*Runtime).CompileModule returned error: %w", err)
@@ -293,7 +293,7 @@ func (c *core) Instantiate() (err error) {
 	if c.instance, err = c.runtime.InstantiateModule(
 		c.ctx,
 		c.module,
-		c.config.ModuleConfigFactory.GetConfig()); err != nil {
+		c.config.ModuleConfig().GetConfig()); err != nil {
 		return fmt.Errorf("water: (*Runtime).InstantiateWithConfig returned error: %w", err)
 	}
 
