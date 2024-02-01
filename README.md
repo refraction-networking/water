@@ -177,25 +177,24 @@ Currently, it supports the following platforms:
 |       Target       | Compiles? | Tests Pass? |
 | ------------------ | --------- | ----------- | 
 | linux/amd64        | ✅        | ✅         |
-| linux/aarch64      | ✅        | ✅         |
+| linux/arm64        | ✅        | ✅         |
 | linux/riscv64      | ✅        | ✅         |
 | macos/amd64        | ✅        | ✅         |
-| macos/aarch64      | ✅        | ✅         |
+| macos/arm64        | ✅        | ✅         |
 | windows/amd64      | ✅        | ✅         |
-| windows/aarch64    | ✅        | ❓         |
+| windows/arm64      | ✅        | ❓         |
 | others             | ❓        | ❓         |
 
 ## Acknowledgments
 
 * We thank [GitHub.com](https://github.com) for providing GitHub Actions runners for all targets below:
-	* `linux/amd64`
-	* `linux/aarch64`*
-	* `linux/riscv64`*
-	* `macos/amd64`
-	* `windows/amd64`
+	* `linux/amd64` on Ubuntu Latest
+	* `linux/arm64` via [docker/setup-qemu-action](https://github.com/docker/setup-qemu-action)
+	* `linux/riscv64` via [docker/setup-qemu-action](https://github.com/docker/setup-qemu-action)
+	* `macos/amd64` on macOS 12
+	* `macos/arm64` on macOS 14
+	* `windows/amd64` on Windows Latest
 
-\* Emulated via [docker/setup-qemu-action](https://github.com/docker/setup-qemu-action).
+* We thank [FlyCI.net](https://www.flyci.net) for providing GitHub Actions runners on `macos/arm64` (Apple M1) _in the past_. (We switched to GitHub's `macos-14` runner as of Jan 31 2024)
 
-* We thank [FlyCI.net](https://www.flyci.net) for providing GitHub Actions runners for `macos/aarch64` (Apple M1)
-
-Looking for help: We are currently actively looking for a CI provider for `windows/aarch64` and more platform. Please reach out and let us know if you would like to help.
+We are currently actively looking for a CI provider for more target platforms. Please reach out and let us know if you would like to help.

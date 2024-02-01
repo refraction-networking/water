@@ -10,11 +10,11 @@ env:
   CGO_ENABLED: 0
 
 jobs:
-  test_amd64:
+  test_amd64_not-mac:
     name: go${{ matrix.go }} (${{ matrix.os }}/amd64)
     strategy:
       matrix:
-        os: [ "ubuntu", "windows", "macos" ] 
+        os: [ "ubuntu", "windows" ] 
         go: [ "1.20", "1.21" ] # we support the latest 2 stable versions of Go
     runs-on: ${{ matrix.os }}-latest # use latest OS image
     steps:
@@ -28,7 +28,7 @@ jobs:
         go build -v ./...
         go test -v ./...
 
-  test_linux-arm64-and-riscv64:
+  test_not-amd64_linux:
     name: go${{ matrix.go }} (linux/${{ matrix.arch }})
     strategy:
       matrix:
@@ -47,13 +47,30 @@ jobs:
       run:  |
         GOARCH=${{ matrix.arch }} go build -v ./...
         GOARCH=${{ matrix.arch }} go test -v ./...
+        
+  test_amd64_mac:
+    name: go${{ matrix.go }} (macos/amd64)
+    strategy:
+      matrix:
+        go: [ "1.20", "1.21" ] # we support the latest 2 stable versions of Go
+    runs-on: macos-12
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go }}.x # use latest patch version under the minor version
+    - run: go version
+    - name: Build and Test
+      run:  |
+        go build -v ./...
+        go test -v ./...
 
-  test_macos-arm64:
+  test_arm64_mac:
     name: go${{ matrix.go }} (macos/arm64)
     strategy:
       matrix:
         go: [ "1.20", "1.21" ] # we support the latest 2 stable versions of Go
-    runs-on: flyci-macos-large-latest-m1 # generously provided by www.flyci.net
+    runs-on: macos-14
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-go@v5
