@@ -20,7 +20,8 @@ import (
 // path and wasm file path.
 func ExampleDialer() {
 	config := &water.Config{
-		TransportModuleBin: wasmReverse,
+		TransportModuleBin:  wasmReverse,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 
 	waterDialer, err := water.NewDialer(config)

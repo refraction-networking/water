@@ -25,7 +25,8 @@ func ExampleRelay() {
 	defer tcpListener.Close() // skipcq: GO-S2307
 
 	config := &water.Config{
-		TransportModuleBin: wasmReverse,
+		TransportModuleBin:  wasmReverse,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 
 	waterRelay, err := v0.NewRelayWithContext(context.Background(), config)

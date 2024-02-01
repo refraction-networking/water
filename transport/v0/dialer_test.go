@@ -17,7 +17,8 @@ import (
 // ExampleDialer demonstrates how to use v0.Dialer as a water.Dialer.
 func ExampleDialer() {
 	config := &water.Config{
-		TransportModuleBin: wasmReverse,
+		TransportModuleBin:  wasmReverse,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 
 	waterDialer, err := v0.NewDialer(config)

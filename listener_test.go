@@ -20,7 +20,8 @@ import (
 // path and wasm file path.
 func ExampleListener() {
 	config := &water.Config{
-		TransportModuleBin: wasmReverse,
+		TransportModuleBin:  wasmReverse,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 
 	waterListener, err := config.ListenContext(context.Background(), "tcp", "localhost:0")
