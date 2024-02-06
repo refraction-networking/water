@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
-	"runtime"
 	"testing"
 	"time"
 
@@ -125,14 +124,7 @@ func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 		t.Fatalf("conn is not *v0.Conn")
 	}
 
-	// trigger garbage collection for several times to simulate any
-	// possible GC in the real world use case
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
+	tripleGC(100 * time.Microsecond)
 
 	var peerSendBuf []byte = make([]byte, 1024)
 	var waterSendBuf []byte = make([]byte, 1024)
@@ -188,9 +180,7 @@ func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 			t.Fatalf("waterRecvBuf != peerSendBuf")
 		}
 
-		// trigger garbage collection
-		runtime.GC()
-		time.Sleep(100 * time.Microsecond)
+		tripleGC(100 * time.Microsecond)
 	}
 
 	// reading with a deadline
@@ -223,9 +213,7 @@ func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 		t.Fatal(err)
 	}
 
-	// trigger garbage collection
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
+	tripleGC(100 * time.Microsecond)
 }
 
 func testListenerReverse(t *testing.T) { // skipcq: GO-R1005
@@ -258,14 +246,7 @@ func testListenerReverse(t *testing.T) { // skipcq: GO-R1005
 		t.Fatalf("conn is not *v0.Conn")
 	}
 
-	// trigger garbage collection for several times to simulate any
-	// possible GC in the real world use case
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
+	tripleGC(100 * time.Microsecond)
 
 	var peerSendBuf []byte = make([]byte, 1024)
 	var waterSendBuf []byte = make([]byte, 1024)
@@ -331,9 +312,7 @@ func testListenerReverse(t *testing.T) { // skipcq: GO-R1005
 			t.Fatalf("waterRecvBuf != peerSendBuf")
 		}
 
-		// trigger garbage collection
-		runtime.GC()
-		time.Sleep(100 * time.Microsecond)
+		tripleGC(100 * time.Microsecond)
 	}
 
 	// reading with a deadline
@@ -366,9 +345,7 @@ func testListenerReverse(t *testing.T) { // skipcq: GO-R1005
 		t.Fatal(err)
 	}
 
-	// trigger garbage collection
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
+	tripleGC(100 * time.Microsecond)
 }
 
 func testListenerPartialWATM(t *testing.T) {

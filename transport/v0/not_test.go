@@ -46,10 +46,7 @@ func benchmarkUnidirectionalStream(b *testing.B, wrConn, rdConn net.Conn) {
 		}
 	}()
 
-	runtime.GC()
-	runtime.GC()
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
+	tripleGC(100 * time.Microsecond)
 
 	b.SetBytes(1024)
 	b.StartTimer()
@@ -95,4 +92,20 @@ func sanityCheckConn(wrConn, rdConn net.Conn, writeMsg, expectRead []byte) error
 	}
 
 	return nil
+}
+
+// Trigger garbage collection for several times to garbage collect
+// most of the objects that is already unreachable.
+//
+// This is to simulate the real-world scenario where the WASM module
+// may enter a weird state by relying on some unreachable objects to
+// function properly and we need to ensure that it does not happen.
+func tripleGC(sleep time.Duration) {
+	runtime.GC()
+	runtime.GC()
+	runtime.GC()
+
+	if sleep > 0 {
+		time.Sleep(sleep)
+	}
 }

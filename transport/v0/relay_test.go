@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -139,14 +138,7 @@ func testRelayPlain(t *testing.T) { // skipcq: GO-R1005
 	}
 	defer serverConn.Close() // skipcq: GO-S2307
 
-	// trigger garbage collection for several times to simulate any
-	// possible GC in the real world use case
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
+	tripleGC(100 * time.Microsecond)
 
 	var clientSendBuf []byte = make([]byte, 1024)
 	var serverSendBuf []byte = make([]byte, 1024)
@@ -202,9 +194,7 @@ func testRelayPlain(t *testing.T) { // skipcq: GO-R1005
 			t.Fatalf("clientRecvBuf != serverSendBuf")
 		}
 
-		// trigger garbage collection
-		runtime.GC()
-		time.Sleep(100 * time.Microsecond)
+		tripleGC(100 * time.Microsecond)
 	}
 
 	// stop relay
@@ -275,14 +265,7 @@ func testRelayReverse(t *testing.T) { // skipcq: GO-R1005
 	}
 	defer serverConn.Close() // skipcq: GO-S2307
 
-	// trigger garbage collection for several times to simulate any
-	// possible GC in the real world use case
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
+	tripleGC(100 * time.Microsecond)
 
 	var clientSendBuf []byte = make([]byte, 1024)
 	var serverSendBuf []byte = make([]byte, 1024)
@@ -348,9 +331,7 @@ func testRelayReverse(t *testing.T) { // skipcq: GO-R1005
 			t.Fatalf("clientRecvBuf != serverSendBuf")
 		}
 
-		// trigger garbage collection
-		runtime.GC()
-		time.Sleep(100 * time.Microsecond)
+		tripleGC(100 * time.Microsecond)
 	}
 
 	// stop relay
