@@ -64,10 +64,12 @@ func (c *Config) Clone() *Config {
 
 	return &Config{
 		TransportModuleBin:    wasmClone,
+		TransportModuleConfig: c.TransportModuleConfig,
 		NetworkDialerFunc:     c.NetworkDialerFunc,
 		NetworkListener:       c.NetworkListener,
-		TransportModuleConfig: c.TransportModuleConfig,
 		ModuleConfigFactory:   c.ModuleConfigFactory.Clone(),
+		RuntimeConfigFactory:  c.RuntimeConfigFactory.Clone(),
+		OverrideLogger:        c.OverrideLogger,
 	}
 }
 

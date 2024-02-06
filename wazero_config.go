@@ -133,6 +133,10 @@ func NewWazeroRuntimeConfigFactory() *WazeroRuntimeConfigFactory {
 }
 
 func (wrcf *WazeroRuntimeConfigFactory) Clone() *WazeroRuntimeConfigFactory {
+	if wrcf == nil {
+		return nil
+	}
+
 	return &WazeroRuntimeConfigFactory{
 		runtimeConfig:    wrcf.runtimeConfig,
 		compilationCache: wrcf.compilationCache,
