@@ -94,6 +94,8 @@ type TransportModule struct {
 
 	deferOnce     sync.Once
 	deferredFuncs []func()
+
+	closeOnce sync.Once
 }
 
 // UpgradeCore upgrades a water.Core to a v0 TransportModule.
@@ -114,9 +116,7 @@ func UpgradeCore(core water.Core) *TransportModule {
 	// and all opened file descriptors (if any) associated with it
 	// when the TransportModule is garbage collected.
 	runtime.SetFinalizer(wasm, func(tm *TransportModule) {
-		_ = tm.Cancel() // tm cannot be nil here as we just set it above
-		tm.DeferAll()
-		tm.Cleanup()
+		tm.Close()
 	})
 
 	return wasm
@@ -214,8 +214,7 @@ func (tm *TransportModule) Cancel() error {
 	return nil
 }
 
-// Clean up the Transport Module by closing all connections pushed into the Transport Module and
-// shutdown the underlying Core.
+// Clean up the Transport Module by closing all connections pushed into the Transport Module.
 func (tm *TransportModule) Cleanup() {
 	// clean up pushed files
 	var keyList []int32
@@ -236,9 +235,29 @@ func (tm *TransportModule) Cleanup() {
 	// clean up deferred functions
 	tm.deferredFuncs = nil
 
-	if err := tm.core.Close(); err != nil {
-		log.LErrorf(tm.core.Logger(), "water: closing core failed: %v", err)
-	}
+	// clean up all saved functions
+	tm._init = nil
+	tm._dial = nil
+	tm._accept = nil
+	tm._associate = nil
+	tm.backgroundWorker._cancel_with = nil
+	tm.backgroundWorker._worker = nil
+}
+
+func (tm *TransportModule) Close() error {
+	var err error
+
+	tm.closeOnce.Do(func() {
+		tm.DeferAll()
+		tm.Cancel()
+		tm.Cleanup()
+		if tm.core != nil {
+			tm.core.Close()
+			tm.core = nil
+		}
+	})
+
+	return err
 }
 
 func (tm *TransportModule) Defer(f func()) {
@@ -349,11 +368,14 @@ func (tm *TransportModule) Initialize() error {
 	var err error
 	// import host_defer function
 	if err = tm.core.ImportFunction("env", "host_defer", func() {
-		tm.DeferAll()
+		// tm.DeferAll() // Deprecated: do nothing here.
+		log.LWarnf(tm.core.Logger(), "water: host_defer function is imported by WATM, "+
+			"it is deprecated and will NOT be executed when WATM exits")
 	}); err != nil {
 		if err == water.ErrFuncNotImported {
-			log.LWarnf(tm.core.Logger(), "water: host_defer function is not imported by WATM, "+
-				"deferred functions will not be executed when WATM exits")
+			// Deprecated: do nothing here.
+			// log.LWarnf(tm.core.Logger(), "water: host_defer function is not imported by WATM, "+
+			// 	"deferred functions will not be executed when WATM exits")
 		} else {
 			return fmt.Errorf("water: (*water.Core).ImportFunction returned error "+
 				"when importing host_defer function: %w", err)

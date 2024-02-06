@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"runtime"
 	"sync"
 
 	"github.com/gaukas/water/internal/log"
@@ -147,6 +148,8 @@ type core struct {
 	importedFuncs         map[string]map[string]api.FunctionDefinition
 
 	importModules map[string]wazero.HostModuleBuilder
+
+	closeOnce sync.Once
 }
 
 // NewCore creates a new Core with the given config.
@@ -172,6 +175,10 @@ func NewCoreWithContext(ctx context.Context, config *Config) (Core, error) {
 		return nil, fmt.Errorf("water: (*Runtime).CompileModule returned error: %w", err)
 	}
 
+	runtime.SetFinalizer(c, func(core *core) {
+		c.Close()
+	})
+
 	return c, nil
 }
 
@@ -185,21 +192,56 @@ func (c *core) Context() context.Context {
 	return c.ctx
 }
 
+func (c *core) cleanup() {
+	for i := range c.importModules {
+		delete(c.importModules, i)
+	}
+
+	for i := range c.exports {
+		delete(c.exports, i)
+	}
+
+	for i := range c.importedFuncs {
+		delete(c.importedFuncs, i)
+	}
+}
+
 // Close implements Core.
 func (c *core) Close() error {
-	if c.instance != nil {
-		if err := c.instance.Close(c.ctx); err != nil {
-			return fmt.Errorf("water: (*wazero/api.Module).Close returned error: %w", err)
-		}
-	}
+	var closeErr error
 
-	if c.runtime != nil {
-		if err := c.runtime.Close(c.ctx); err != nil {
-			return fmt.Errorf("water: (*wazero.Runtime).Close returned error: %w", err)
+	c.closeOnce.Do(func() {
+		if c.instance != nil {
+			if err := c.instance.Close(c.ctx); err != nil {
+				closeErr = fmt.Errorf("water: (*wazero/api.Module).Close returned error: %w", err)
+				return
+			}
+			c.instance = nil // TODO: force dropped
+			log.LDebugf(c.config.Logger(), "INSTANCE DROPPED")
 		}
-	}
 
-	return nil
+		if c.runtime != nil {
+			if err := c.runtime.Close(c.ctx); err != nil {
+				closeErr = fmt.Errorf("water: (*wazero.Runtime).Close returned error: %w", err)
+				return
+			}
+			c.runtime = nil // TODO: force dropped
+			log.LDebugf(c.config.Logger(), "RUNTIME DROPPED")
+		}
+
+		if c.module != nil {
+			if err := c.module.Close(c.ctx); err != nil {
+				closeErr = fmt.Errorf("water: (*wazero.CompiledModule).Close returned error: %w", err)
+				return
+			}
+			c.module = nil // TODO: force dropped
+			log.LDebugf(c.config.Logger(), "MODULE DROPPED")
+		}
+
+		c.cleanup()
+	})
+
+	return closeErr
 }
 
 // Exports implements Core.
