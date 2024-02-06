@@ -26,4 +26,9 @@ type ConfigJSON struct {
 		InheritStderr bool              `json:"inherit_stderr,omitempty"`
 		PreopenedDirs map[string]string `json:"preopened_dirs,omitempty"` // hostPath: guestPath
 	} `json:"module,omitempty"`
+
+	Runtime struct {
+		ForceInterpreter bool `json:"force_interpreter,omitempty"` // If set, will use interpreter mode even on platforms with compiler support
+		// Setting CompilationCache is not supported yet through JSON
+	} `json:"runtime,omitempty"`
 }

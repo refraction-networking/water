@@ -218,6 +218,11 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		c.ModuleConfigFactory.SetPreopenDir(k, v)
 	}
 
+	c.RuntimeConfigFactory = NewWazeroRuntimeConfigFactory()
+	if confJson.Runtime.ForceInterpreter {
+		c.RuntimeConfig().Interpreter()
+	}
+
 	return nil
 }
 
@@ -283,6 +288,10 @@ func (c *Config) UnmarshalProto(b []byte) error {
 
 	for k, v := range confProto.GetModule().GetPreopenedDirs() {
 		c.ModuleConfigFactory.SetPreopenDir(k, v)
+	}
+
+	if confProto.GetRuntime().GetForceInterpreter() {
+		c.RuntimeConfig().Interpreter()
 	}
 
 	return nil
