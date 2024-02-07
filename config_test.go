@@ -76,7 +76,7 @@ func testConfigNetworkDialerFuncNil(t *testing.T) {
 
 	c := &water.Config{}
 	dialer := c.NetworkDialerFuncOrDefault()
-	dialer("tcp", "localhost:0")
+	dialer("tcp", "localhost:0") //nolint:errcheck
 }
 
 func testConfigNetworkDialerFuncValid(t *testing.T) {

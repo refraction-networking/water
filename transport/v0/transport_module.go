@@ -250,7 +250,7 @@ func (tm *TransportModule) Close() error {
 
 	tm.closeOnce.Do(func() {
 		tm.DeferAll()
-		tm.Cancel()
+		err = tm.Cancel()
 		tm.Cleanup()
 		tm.coreMutex.Lock()
 		if tm.core != nil {
