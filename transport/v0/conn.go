@@ -28,7 +28,8 @@ type Conn struct {
 	// to talk to a remote destination by actively dialing to it.
 	dstConn net.Conn // the connection to the remote destination, usually a *net.TCPConn
 
-	tm *TransportModule
+	tm      *TransportModule
+	tmMutex sync.Mutex
 
 	closeOnce sync.Once
 	closed    atomic.Bool
@@ -70,20 +71,14 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 		return nil, err
 	}
 
-	if err := conn.tm.Worker(); err != nil {
-		return nil, err
-	}
-
-	log.LDebugf(core.Logger(), "water: v0.dial: conn.tm.Worker() returned")
-
 	// safety: we need to watch for the blocking worker thread's status.
 	// If it returns, no further data can be processed by the WASM module
 	// and we need to close this connection in that case.
-	go func() {
-		<-conn.tm.WorkerErrored()
-		log.LDebugf(core.Logger(), "water: v0.dial: worker thread returned")
-		conn.Close()
-	}()
+	go conn.closeOnWorkerError()
+
+	if err := conn.tm.Worker(); err != nil {
+		return nil, err
+	}
 
 	return conn, nil
 }
@@ -122,18 +117,14 @@ func accept(core water.Core) (c water.Conn, err error) {
 		return nil, err
 	}
 
-	if err := conn.tm.Worker(); err != nil {
-		return nil, err
-	}
-
 	// safety: we need to watch for the blocking worker thread's status.
 	// If it returns, no further data can be processed by the WASM module
 	// and we need to close this connection in that case.
-	go func() {
-		<-conn.tm.WorkerErrored()
-		log.LDebugf(core.Logger(), "water: v0.accept: worker thread returned")
-		conn.Close()
-	}()
+	go conn.closeOnWorkerError()
+
+	if err := conn.tm.Worker(); err != nil {
+		return nil, err
+	}
 
 	return conn, nil
 }
@@ -158,20 +149,32 @@ func relay(core water.Core, network, address string) (c water.Conn, err error) {
 		return nil, err
 	}
 
+	// safety: we need to watch for the blocking worker thread's status.
+	// If it returns, no further data can be processed by the WASM module
+	// and we need to close this connection in that case.
+	go conn.closeOnWorkerError()
+
 	if err := conn.tm.Worker(); err != nil {
 		return nil, err
 	}
 
-	// safety: we need to watch for the blocking worker thread's status.
-	// If it returns, no further data can be processed by the WASM module
-	// and we need to close this connection in that case.
-	go func() {
-		<-conn.tm.WorkerErrored()
-		log.LDebugf(core.Logger(), "water: v0.relay: worker thread returned")
-		conn.Close()
-	}()
-
 	return conn, nil
+}
+
+func (c *Conn) closeOnWorkerError() {
+	var tm *TransportModule
+	var core water.Core
+
+	c.tmMutex.Lock()
+	if c.tm != nil {
+		tm = c.tm
+		core = tm.Core()
+	}
+	c.tmMutex.Unlock()
+
+	<-tm.WorkerErrored()
+	log.LDebugf(core.Logger(), "water: v0.accept: worker thread returned")
+	c.Close()
 }
 
 // Read implements the net.Conn interface.
@@ -218,10 +221,12 @@ func (c *Conn) Close() (err error) {
 	}
 
 	c.closeOnce.Do(func() {
+		c.tmMutex.Lock()
 		if c.tm != nil {
 			err = c.tm.Close()
 			c.tm = nil
 		}
+		c.tmMutex.Unlock()
 	})
 
 	return err
