@@ -71,6 +71,7 @@ func (c transportModuleConfigBytes) AsFile() (*os.File, error) {
 		return nil, fmt.Errorf("failed to create temp file for transport module config: %w", err)
 	}
 	runtime.SetFinalizer(f, func(tmpFile *os.File) {
+		tmpFile.Close()
 		// Remove the temp file from local file system when collected.
 		//
 		// This does NOT guarantee the temp file will always be removed

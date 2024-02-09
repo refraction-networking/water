@@ -8,6 +8,7 @@ message Config {
     TransportModule transport_module = 1;
     Network network = 2;
     Module module = 3;
+    Runtime runtime = 4;
 }
 
 message TransportModule {
@@ -31,4 +32,8 @@ message Module {
     bool inherit_stdout = 4;
     bool inherit_stderr = 5;
     map<string, string> preopened_dirs = 6;
+}
+
+message Runtime {
+    bool force_interpreter = 1;    
 }

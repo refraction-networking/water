@@ -18,7 +18,8 @@ import (
 // Transport Module API-facing functions and utilities that are exclusive to
 // version 0.
 type TransportModule struct {
-	core water.Core
+	core      water.Core
+	coreMutex sync.RWMutex
 
 	_init func() (int32, error) // _init() -> (err i32)
 
@@ -94,6 +95,8 @@ type TransportModule struct {
 
 	deferOnce     sync.Once
 	deferredFuncs []func()
+
+	closeOnce sync.Once
 }
 
 // UpgradeCore upgrades a water.Core to a v0 TransportModule.
@@ -114,9 +117,7 @@ func UpgradeCore(core water.Core) *TransportModule {
 	// and all opened file descriptors (if any) associated with it
 	// when the TransportModule is garbage collected.
 	runtime.SetFinalizer(wasm, func(tm *TransportModule) {
-		_ = tm.Cancel() // tm cannot be nil here as we just set it above
-		tm.DeferAll()
-		tm.Cleanup()
+		tm.Close()
 	})
 
 	return wasm
@@ -214,8 +215,7 @@ func (tm *TransportModule) Cancel() error {
 	return nil
 }
 
-// Clean up the Transport Module by closing all connections pushed into the Transport Module and
-// shutdown the underlying Core.
+// Clean up the Transport Module by closing all connections pushed into the Transport Module.
 func (tm *TransportModule) Cleanup() {
 	// clean up pushed files
 	var keyList []int32
@@ -223,7 +223,7 @@ func (tm *TransportModule) Cleanup() {
 	for k, v := range tm.pushedConn {
 		if v != nil {
 			if err := v.Close(); err != nil {
-				log.LErrorf(tm.core.Logger(), "water: closing pushed connection failed: %v", err)
+				log.LErrorf(tm.Core().Logger(), "water: closing pushed connection failed: %v", err)
 			}
 		}
 		keyList = append(keyList, k)
@@ -236,9 +236,38 @@ func (tm *TransportModule) Cleanup() {
 	// clean up deferred functions
 	tm.deferredFuncs = nil
 
-	if err := tm.core.Close(); err != nil {
-		log.LErrorf(tm.core.Logger(), "water: closing core failed: %v", err)
-	}
+	// clean up all saved functions
+	tm._init = nil
+	tm._dial = nil
+	tm._accept = nil
+	tm._associate = nil
+	tm.backgroundWorker._cancel_with = nil
+	tm.backgroundWorker._worker = nil
+}
+
+func (tm *TransportModule) Close() error {
+	var err error
+
+	tm.closeOnce.Do(func() {
+		tm.DeferAll()
+		err = tm.Cancel()
+		tm.Cleanup()
+		tm.coreMutex.Lock()
+		if tm.core != nil {
+			tm.core.Close()
+			tm.core = nil
+		}
+		tm.coreMutex.Unlock()
+	})
+
+	return err
+}
+
+func (tm *TransportModule) Core() water.Core {
+	tm.coreMutex.RLock()
+	core := tm.core
+	defer tm.coreMutex.RUnlock()
+	return core
 }
 
 func (tm *TransportModule) Defer(f func()) {
@@ -287,12 +316,12 @@ func (tm *TransportModule) LinkNetworkInterface(dialer *ManagedDialer, listener 
 		dialerFunc = func() (fd int32) {
 			conn, err := dialer.Dial()
 			if err != nil {
-				log.LErrorf(tm.core.Logger(), "water: dialer.Dial: %v", err)
+				log.LErrorf(tm.Core().Logger(), "water: dialer.Dial: %v", err)
 				return wasip1.EncodeWATERError(syscall.ENOTCONN) // not connected
 			}
 			fd, err = tm.PushConn(conn)
 			if err != nil {
-				log.LErrorf(tm.core.Logger(), "water: PushConn: %v", err)
+				log.LErrorf(tm.Core().Logger(), "water: PushConn: %v", err)
 			}
 			return fd
 		}
@@ -302,7 +331,7 @@ func (tm *TransportModule) LinkNetworkInterface(dialer *ManagedDialer, listener 
 		}
 	}
 
-	if err := tm.core.ImportFunction("env", "host_dial", dialerFunc); err != nil {
+	if err := tm.Core().ImportFunction("env", "host_dial", dialerFunc); err != nil {
 		if dialer != nil || err != water.ErrFuncNotImported {
 			return fmt.Errorf("water: linking dialer function, (*water.Core).ImportFunction: %w", err)
 		}
@@ -313,12 +342,12 @@ func (tm *TransportModule) LinkNetworkInterface(dialer *ManagedDialer, listener 
 		acceptFunc = func() (fd int32) {
 			conn, err := listener.Accept()
 			if err != nil {
-				log.LErrorf(tm.core.Logger(), "water: listener.Accept: %v", err)
+				log.LErrorf(tm.Core().Logger(), "water: listener.Accept: %v", err)
 				return wasip1.EncodeWATERError(syscall.ENOTCONN) // not connected
 			}
 			fd, err = tm.PushConn(conn)
 			if err != nil {
-				log.LErrorf(tm.core.Logger(), "water: PushConn: %v", err)
+				log.LErrorf(tm.Core().Logger(), "water: PushConn: %v", err)
 			}
 			return fd
 		}
@@ -328,7 +357,7 @@ func (tm *TransportModule) LinkNetworkInterface(dialer *ManagedDialer, listener 
 		}
 	}
 
-	if err := tm.core.ImportFunction("env", "host_accept", acceptFunc); err != nil {
+	if err := tm.Core().ImportFunction("env", "host_accept", acceptFunc); err != nil {
 		if listener != nil || err != water.ErrFuncNotImported {
 			return fmt.Errorf("water: linking listener function, (*water.Core).ImportFunction: %w", err)
 		}
@@ -342,34 +371,39 @@ func (tm *TransportModule) LinkNetworkInterface(dialer *ManagedDialer, listener 
 //
 // All imports must be set before calling this function.
 func (tm *TransportModule) Initialize() error {
-	if tm.core == nil {
+	if tm.Core() == nil {
 		return fmt.Errorf("water: core is not initialized")
 	}
 
 	var err error
 	// import host_defer function
-	if err = tm.core.ImportFunction("env", "host_defer", func() {
-		tm.DeferAll()
+	if err = tm.Core().ImportFunction("env", "host_defer", func() {
+		// tm.DeferAll() // Deprecated: do nothing here.
+		log.LWarnf(tm.Core().Logger(), "water: host_defer is invoked by WATM, since it is deprecated, it does nothing")
 	}); err != nil {
 		if err == water.ErrFuncNotImported {
-			log.LWarnf(tm.core.Logger(), "water: host_defer function is not imported by WATM, "+
-				"deferred functions will not be executed when WATM exits")
+			// Deprecated: do nothing here.
+			// log.LWarnf(tm.Core().Logger(), "water: host_defer function is not imported by WATM, "+
+			// 	"deferred functions will not be executed when WATM exits")
 		} else {
 			return fmt.Errorf("water: (*water.Core).ImportFunction returned error "+
 				"when importing host_defer function: %w", err)
 		}
+	} else {
+		log.LWarnf(tm.Core().Logger(), "water: host_defer function is imported by WATM, "+
+			"it is deprecated and will NOT be executed when WATM exits")
 	}
 
 	// import pull_config function (it is called pushConfig here in the host)
-	if err = tm.core.ImportFunction("env", "pull_config", tm.pushConfig); err != nil {
+	if err = tm.Core().ImportFunction("env", "pull_config", tm.pushConfig); err != nil {
 		if err == water.ErrFuncNotImported {
 			// If a config is provided, we will warn the user that the config WILL NOT be
 			// pushed to the WASM module.
-			if tm.core.Config().TransportModuleConfig != nil {
-				f, err := tm.core.Config().TransportModuleConfig.AsFile()
+			if tm.Core().Config().TransportModuleConfig != nil {
+				f, err := tm.Core().Config().TransportModuleConfig.AsFile()
 				if f != nil && err == nil {
 					// there is a config file provided, must warn
-					log.LWarnf(tm.core.Logger(), "water: pull_config function is not imported by WATM, "+
+					log.LWarnf(tm.Core().Logger(), "water: pull_config function is not imported by WATM, "+
 						"config file will not be pushed to the WASM module")
 				}
 			}
@@ -380,14 +414,14 @@ func (tm *TransportModule) Initialize() error {
 	}
 
 	// instantiate the WASM module
-	if err = tm.core.Instantiate(); err != nil {
+	if err = tm.Core().Instantiate(); err != nil {
 		return err
 	}
 
-	coreCtx := tm.core.Context()
+	coreCtx := tm.Core().Context()
 
 	// _init
-	init := tm.core.ExportedFunction("_water_init")
+	init := tm.Core().ExportedFunction("_water_init")
 	if init == nil {
 		return fmt.Errorf("water: WASM module does not export _water_init")
 	} else {
@@ -414,9 +448,9 @@ func (tm *TransportModule) Initialize() error {
 	}
 
 	// _dial
-	dial := tm.core.ExportedFunction("_water_dial")
+	dial := tm.Core().ExportedFunction("_water_dial")
 	if dial == nil {
-		log.LWarnf(tm.core.Logger(), "water: WASM module does not export _water_dial, water.Dialer will not work.")
+		log.LWarnf(tm.Core().Logger(), "water: WASM module does not export _water_dial, water.Dialer will not work.")
 		tm._dial = func(callerFd int32) (int32, error) {
 			return 0, water.ErrUnimplementedDialer
 		}
@@ -446,9 +480,9 @@ func (tm *TransportModule) Initialize() error {
 	}
 
 	// _accept
-	accept := tm.core.ExportedFunction("_water_accept")
+	accept := tm.Core().ExportedFunction("_water_accept")
 	if accept == nil {
-		log.LWarnf(tm.core.Logger(), "water: WASM module does not export _water_accept, water.Listener will not work.")
+		log.LWarnf(tm.Core().Logger(), "water: WASM module does not export _water_accept, water.Listener will not work.")
 		tm._accept = func(callerFd int32) (int32, error) {
 			return 0, water.ErrUnimplementedListener
 		}
@@ -478,9 +512,9 @@ func (tm *TransportModule) Initialize() error {
 	}
 
 	// _associate
-	associate := tm.core.ExportedFunction("_water_associate")
+	associate := tm.Core().ExportedFunction("_water_associate")
 	if associate == nil {
-		log.LWarnf(tm.core.Logger(), "water: WASM module does not export _water_associate, water.Relay will not work.")
+		log.LWarnf(tm.Core().Logger(), "water: WASM module does not export _water_associate, water.Relay will not work.")
 		tm._associate = func() (int32, error) {
 			return 0, water.ErrUnimplementedRelay
 		}
@@ -508,7 +542,7 @@ func (tm *TransportModule) Initialize() error {
 	}
 
 	// _cancel_with
-	cancelWith := tm.core.ExportedFunction("_water_cancel_with")
+	cancelWith := tm.Core().ExportedFunction("_water_cancel_with")
 	if cancelWith == nil {
 		return fmt.Errorf("water: WASM module does not export _water_cancel_with")
 	} else {
@@ -528,7 +562,7 @@ func (tm *TransportModule) Initialize() error {
 	}
 
 	// _worker
-	worker := tm.core.ExportedFunction("_water_worker")
+	worker := tm.Core().ExportedFunction("_water_worker")
 	if worker == nil {
 		return fmt.Errorf("water: WASM module does not export _water_worker")
 	} else {
@@ -611,7 +645,7 @@ func (tm *TransportModule) Worker() error {
 		return fmt.Errorf("water: calling _water_cancel_with: %w", err)
 	}
 
-	log.LDebugf(tm.core.Logger(), "water: starting worker thread")
+	log.LDebugf(tm.Core().Logger(), "water: starting worker thread")
 
 	// in a goroutine, call _worker
 	go func() {
@@ -625,18 +659,18 @@ func (tm *TransportModule) Worker() error {
 			tm.backgroundWorker.chanWorkerErr <- err
 			return
 		} else {
-			log.LDebugf(tm.core.Logger(), "water: worker thread exited with code 0")
+			log.LDebugf(tm.Core().Logger(), "water: worker thread exited with code 0")
 		}
 	}()
 
-	log.LDebugf(tm.core.Logger(), "water: worker thread started")
+	log.LDebugf(tm.Core().Logger(), "water: worker thread started")
 
 	// last sanity check if the worker thread crashed immediately even before we return
 	select {
 	case err := <-tm.backgroundWorker.chanWorkerErr: // if already returned, basically it failed to start
 		return fmt.Errorf("water: worker thread returned error: %w", err)
 	default:
-		log.LDebugf(tm.core.Logger(), "water: Worker (func, not the worker thread) returning")
+		log.LDebugf(tm.Core().Logger(), "water: Worker (func, not the worker thread) returning")
 		return nil
 	}
 }
@@ -651,21 +685,21 @@ func (tm *TransportModule) WorkerErrored() <-chan error {
 
 func (tm *TransportModule) pushConfig() int32 {
 	// get config file
-	if tm.core.Config().TransportModuleConfig == nil {
-		log.LWarnf(tm.core.Logger(), "water: WATM tried to pull config, but none is provided")
+	if tm.Core().Config().TransportModuleConfig == nil {
+		log.LWarnf(tm.Core().Logger(), "water: WATM tried to pull config, but none is provided")
 		return wasip1.EncodeWATERError(syscall.EACCES) // No config file provided
 	}
 
-	configFile, err := tm.core.Config().TransportModuleConfig.AsFile()
+	configFile, err := tm.Core().Config().TransportModuleConfig.AsFile()
 	if err == nil {
-		log.LErrorf(tm.core.Logger(), "water: getting config file failed: %v", err)
+		log.LErrorf(tm.Core().Logger(), "water: getting config file failed: %v", err)
 		return wasip1.EncodeWATERError(syscall.EBADF) // Cannot read a provided config file
 	}
 
 	// push config file into WebAssembly instance
-	configFd, err := tm.core.InsertFile(configFile)
+	configFd, err := tm.Core().InsertFile(configFile)
 	if err != nil {
-		log.LErrorf(tm.core.Logger(), "water: pushing config file failed: %v", err)
+		log.LErrorf(tm.Core().Logger(), "water: pushing config file failed: %v", err)
 		return wasip1.EncodeWATERError(syscall.EBADF) // Cannot push a config file
 	}
 
@@ -674,7 +708,7 @@ func (tm *TransportModule) pushConfig() int32 {
 
 // PushConn pushes a net.Conn into the Transport Module.
 func (tm *TransportModule) PushConn(conn net.Conn) (fd int32, err error) {
-	fd, err = tm.core.InsertConn(conn)
+	fd, err = tm.Core().InsertConn(conn)
 	if err != nil {
 		return wasip1.EncodeWATERError(syscall.EBADF), err // Cannot push a connection
 	}

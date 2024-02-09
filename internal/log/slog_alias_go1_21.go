@@ -10,7 +10,8 @@ import (
 // importing slog in the rest of the code, since slog needs to be
 // imported conditionally based on the Go version.
 type Logger = slog.Logger
-type Handler = slog.Handler
+type Handler = LogHandler // Deprecated: use LogHandler. The naming of this type is ambiguous.
+type LogHandler = slog.Handler
 
 var defaultLogger *Logger = slog.Default()
 
@@ -18,13 +19,21 @@ var defaultLogger *Logger = slog.Default()
 // By default, slog.Default() is used.
 //
 // It overrides the logger created by SetDefaultHandler.
-func SetDefaultLogger(logger *slog.Logger) {
+func SetDefaultLogger(logger *Logger) {
 	defaultLogger = logger
 }
 
 // SetDefaultHandler specifies the handler to be used by the package.
 //
 // It overrides the logger specified by SetDefaultLogger.
-func SetDefaultHandler(handler slog.Handler) {
+func SetDefaultHandler(handler LogHandler) {
 	defaultLogger = slog.New(handler)
+}
+
+// DefaultLogger returns the current default logger.
+//
+// It might not be equivalent to slog.Default() if SetDefaultLogger
+// or SetDefaultHandler was called before.
+func DefaultLogger() *Logger {
+	return defaultLogger
 }

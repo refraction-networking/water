@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	rand "crypto/rand"
 
@@ -133,6 +134,10 @@ func NewWazeroRuntimeConfigFactory() *WazeroRuntimeConfigFactory {
 }
 
 func (wrcf *WazeroRuntimeConfigFactory) Clone() *WazeroRuntimeConfigFactory {
+	if wrcf == nil {
+		return nil
+	}
+
 	return &WazeroRuntimeConfigFactory{
 		runtimeConfig:    wrcf.runtimeConfig,
 		compilationCache: wrcf.compilationCache,
@@ -169,8 +174,12 @@ func (wrcf *WazeroRuntimeConfigFactory) SetCompilationCache(cache wazero.Compila
 }
 
 var globalCompilationCache wazero.CompilationCache
+var globalCompilationCacheMutex = new(sync.Mutex)
 
 func getGlobalCompilationCache() wazero.CompilationCache {
+	globalCompilationCacheMutex.Lock()
+	defer globalCompilationCacheMutex.Unlock()
+
 	if globalCompilationCache == nil {
 		var err error
 		globalCompilationCache, err = wazero.NewCompilationCacheWithDir(fmt.Sprintf("%s%c%s", os.TempDir(), os.PathSeparator, "waterwazerocache"))
@@ -185,5 +194,7 @@ func getGlobalCompilationCache() wazero.CompilationCache {
 // runtime. This is useful for sharing the cache between multiple WebAssembly
 // modules and should be called before any WebAssembly module is instantiated.
 func SetGlobalCompilationCache(cache wazero.CompilationCache) {
+	globalCompilationCacheMutex.Lock()
 	globalCompilationCache = cache
+	globalCompilationCacheMutex.Unlock()
 }

@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
-	"runtime"
 	"testing"
 	"time"
 
@@ -132,14 +131,7 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 	}
 	defer peerConn.Close() // skipcq: GO-S2307
 
-	// trigger garbage collection for several times to simulate any
-	// possible GC in the real world use case
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
+	tripleGC(100 * time.Microsecond)
 
 	var waterSendBuf []byte = make([]byte, 1024)
 	var peerSendBuf []byte = make([]byte, 1024)
@@ -195,9 +187,7 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 			t.Fatalf("waterRecvBuf != peerSendBuf")
 		}
 
-		// trigger garbage collection
-		runtime.GC()
-		time.Sleep(100 * time.Microsecond)
+		tripleGC(100 * time.Microsecond)
 	}
 
 	// reading with a deadline
@@ -230,9 +220,7 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 		t.Fatal(err)
 	}
 
-	// trigger garbage collection
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
+	tripleGC(100 * time.Microsecond)
 }
 
 func testDialerReverse(t *testing.T) { // skipcq: GO-R1005
@@ -268,14 +256,7 @@ func testDialerReverse(t *testing.T) { // skipcq: GO-R1005
 	}
 	defer peerConn.Close() // skipcq: GO-S2307
 
-	// trigger garbage collection for several times to simulate any
-	// possible GC in the real world use case
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
+	tripleGC(100 * time.Microsecond)
 
 	var waterSendBuf []byte = make([]byte, 1024)
 	var peerSendBuf []byte = make([]byte, 1024)
@@ -341,9 +322,7 @@ func testDialerReverse(t *testing.T) { // skipcq: GO-R1005
 			t.Fatalf("waterRecvBuf != peerSendBuf")
 		}
 
-		// trigger garbage collection
-		runtime.GC()
-		time.Sleep(100 * time.Microsecond)
+		tripleGC(100 * time.Microsecond)
 	}
 
 	// reading with a deadline
@@ -376,9 +355,7 @@ func testDialerReverse(t *testing.T) { // skipcq: GO-R1005
 		t.Fatal(err)
 	}
 
-	// trigger garbage collection
-	runtime.GC()
-	time.Sleep(100 * time.Microsecond)
+	tripleGC(100 * time.Microsecond)
 }
 
 func testDialerPartialWATM(t *testing.T) {
