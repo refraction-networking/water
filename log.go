@@ -12,10 +12,11 @@ func SetDefaultLogger(logger *log.Logger) {
 	log.SetDefaultLogger(logger)
 }
 
-// SetDefaultHandler sets the handler to be used by the package
+// SetDefaultLogHandler sets the handler to be used by the package
 // if no logger is specifically configured for each component.
+// Renamed from SetDefaultHandler.
 //
 // It overrides the logger specified by SetDefaultLogger.
-func SetDefaultHandler(handler log.Handler) {
+func SetDefaultLogHandler(handler log.Handler) {
 	log.SetDefaultHandler(handler)
 }
