@@ -28,7 +28,8 @@ type ConfigJSON struct {
 	} `json:"module,omitempty"`
 
 	Runtime struct {
-		ForceInterpreter bool `json:"force_interpreter,omitempty"` // If set, will use interpreter mode even on platforms with compiler support
+		ForceInterpreter        bool `json:"force_interpreter,omitempty"`            // If set, will use interpreter mode even on platforms with compiler support
+		DoNotCloseOnContextDone bool `json:"do_not_close_on_context_done,omitempty"` // If unset, will close the module when the context is done and prevent any further calls to the module
 		// Setting CompilationCache is not supported yet through JSON
 	} `json:"runtime,omitempty"`
 }
