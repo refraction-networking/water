@@ -44,29 +44,12 @@ var (
 	ErrListenerAlreadyRegistered = errors.New("water: listener already registered")
 	ErrListenerVersionNotFound   = errors.New("water: listener version not found")
 	ErrUnimplementedListener     = errors.New("water: unimplemented Listener")
-
-	_ Listener = (*UnimplementedListener)(nil) // type guard
 )
 
 // UnimplementedListener is a Listener that always returns errors.
 //
 // It is used to ensure forward compatibility of the Listener interface.
 type UnimplementedListener struct{}
-
-// Accept implements net.Listener.Accept().
-func (*UnimplementedListener) Accept() (net.Conn, error) {
-	return nil, ErrUnimplementedListener
-}
-
-// Close implements net.Listener.Close().
-func (*UnimplementedListener) Close() error {
-	return ErrUnimplementedListener
-}
-
-// Addr implements net.Listener.Addr().
-func (*UnimplementedListener) Addr() net.Addr {
-	return nil
-}
 
 // AcceptWATER implements water.Listener.AcceptWATER().
 func (*UnimplementedListener) AcceptWATER() (Conn, error) {
