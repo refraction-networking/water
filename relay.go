@@ -85,7 +85,7 @@ func (*UnimplementedRelay) Addr() net.Addr {
 // mustEmbedUnimplementedRelay is a function that developers cannot
 // manually implement. It is used to ensure forward compatibility of
 // the Relay interface.
-func (*UnimplementedRelay) mustEmbedUnimplementedRelay() {}
+func (*UnimplementedRelay) mustEmbedUnimplementedRelay() {} //nolint:unused
 
 // RegisterWATMRelay is a function used by Transport Module drivers
 // (e.g., `transport/v0`) to register a function that spawns a new [Relay]

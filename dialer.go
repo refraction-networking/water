@@ -60,7 +60,7 @@ func (*UnimplementedDialer) DialContext(_ context.Context, _, _ string) (Conn, e
 // mustEmbedUnimplementedDialer is a function that developers cannot
 // manually implement. It is used to ensure forward compatibility of
 // the Dialer interface.
-func (*UnimplementedDialer) mustEmbedUnimplementedDialer() {}
+func (*UnimplementedDialer) mustEmbedUnimplementedDialer() {} //nolint:unused
 
 // RegisterWATMDialer is a function used by Transport Module drivers
 // (e.g., `transport/v0`) to register a function that spawns a new [Dialer]

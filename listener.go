@@ -57,7 +57,7 @@ func (*UnimplementedListener) AcceptWATER() (Conn, error) {
 }
 
 // mustEmbedUnimplementedListener is a function that developers cannot
-func (*UnimplementedListener) mustEmbedUnimplementedListener() {}
+func (*UnimplementedListener) mustEmbedUnimplementedListener() {} //nolint:unused
 
 // RegisterWATMListener is a function used by Transport Module drivers
 // (e.g., `transport/v0`) to register a function that spawns a new [Listener]
