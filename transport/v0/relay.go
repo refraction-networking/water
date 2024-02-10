@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	err := water.RegisterRelay("_water_v0", NewRelayWithContext)
+	err := water.RegisterWATMRelay("_water_v0", NewRelayWithContext)
 	if err != nil {
 		panic(err)
 	}

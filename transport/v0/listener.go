@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	err := water.RegisterListener("_water_v0", NewListenerWithContext)
+	err := water.RegisterWATMListener("_water_v0", NewListenerWithContext)
 	if err != nil {
 		panic(err)
 	}

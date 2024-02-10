@@ -8,7 +8,7 @@ import (
 )
 
 func init() {
-	err := water.RegisterDialer("_water_v0", NewDialer)
+	err := water.RegisterWATMDialer("_water_v0", NewDialer)
 	if err != nil {
 		panic(err)
 	}

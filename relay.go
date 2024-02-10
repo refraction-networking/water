@@ -87,10 +87,13 @@ func (*UnimplementedRelay) Addr() net.Addr {
 // the Relay interface.
 func (*UnimplementedRelay) mustEmbedUnimplementedRelay() {}
 
-// RegisterRelay registers a relay function for the given version to
-// the global registry. Only registered versions can be recognized and
-// used by NewRelay().
-func RegisterRelay(version string, relay newRelayFunc) error {
+// RegisterWATMRelay is a function used by Transport Module drivers
+// (e.g., `transport/v0`) to register a function that spawns a new [Relay]
+// from a given [Config] for a specific version. Renamed from RegisterRelay.
+//
+// This is not a part of WATER API and should not be used by developers
+// wishing to integrate WATER into their applications.
+func RegisterWATMRelay(version string, relay newRelayFunc) error {
 	if _, ok := knownRelayVersions[version]; ok {
 		return ErrRelayAlreadyRegistered
 	}
@@ -103,7 +106,7 @@ func RegisterRelay(version string, relay newRelayFunc) error {
 // It automatically detects the version of the WebAssembly Transport
 // Module specified in the config.
 //
-// Deprecated: use NewRelayWithContext instead.
+// Deprecated: use [NewRelayWithContext] instead.
 func NewRelay(c *Config) (Relay, error) {
 	return NewRelayWithContext(context.Background(), c)
 }

@@ -76,10 +76,13 @@ func (*UnimplementedListener) AcceptWATER() (Conn, error) {
 // mustEmbedUnimplementedListener is a function that developers cannot
 func (*UnimplementedListener) mustEmbedUnimplementedListener() {}
 
-// RegisterListener registers a Listener function for the given version to
-// the global registry. Only registered versions can be recognized and
-// used by NewListener().
-func RegisterListener(version string, listener newListenerFunc) error {
+// RegisterWATMListener is a function used by Transport Module drivers
+// (e.g., `transport/v0`) to register a function that spawns a new [Listener]
+// from a given [Config] for a specific version. Renamed from RegisterListener.
+//
+// This is not a part of WATER API and should not be used by developers
+// wishing to integrate WATER into their applications.
+func RegisterWATMListener(version string, listener newListenerFunc) error {
 	if _, ok := knownListenerVersions[version]; ok {
 		return ErrListenerAlreadyRegistered
 	}
@@ -92,7 +95,7 @@ func RegisterListener(version string, listener newListenerFunc) error {
 // It automatically detects the version of the WebAssembly Transport
 // Module specified in the config.
 //
-// Deprecated: use NewListenerWithContext instead.
+// Deprecated: use [NewListenerWithContext] instead.
 func NewListener(c *Config) (Listener, error) {
 	return NewListenerWithContext(context.Background(), c)
 }
