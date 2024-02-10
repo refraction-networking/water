@@ -179,7 +179,7 @@ func (c *Conn) closeOnWorkerError() {
 
 // Read implements the net.Conn interface.
 //
-// It calls to the underlying user-oriented net.Conn's Read() method.
+// It calls to the underlying user-oriented connection's [net.Conn.Read] method.
 func (c *Conn) Read(b []byte) (n int, err error) {
 	if c.callerConn == nil {
 		return 0, errors.New("water: cannot read, (*RuntimeConn).uoConn is nil")
@@ -190,7 +190,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 
 // Write implements the net.Conn interface.
 //
-// It calls to the underlying user-oriented net.Conn's Write() method.
+// It calls to the underlying user-oriented connection's [net.Conn.Write] method.
 func (c *Conn) Write(b []byte) (n int, err error) {
 	if c.callerConn == nil {
 		return 0, errors.New("water: cannot write, (*RuntimeConn).uoConn is nil")
@@ -234,7 +234,7 @@ func (c *Conn) Close() (err error) {
 
 // LocalAddr implements the net.Conn interface.
 //
-// It calls to the underlying network connection's LocalAddr() method.
+// It calls to the underlying network connection's [net.Conn.LocalAddr] method.
 // For Listener and Relay, the network connection of interest is the srcConn.
 // And for Dialer, the network connection of interest is the dstConn.
 func (c *Conn) LocalAddr() net.Addr {
@@ -247,7 +247,7 @@ func (c *Conn) LocalAddr() net.Addr {
 
 // RemoteAddr implements the net.Conn interface.
 //
-// It calls to the underlying network connection's RemoteAddr() method.
+// It calls to the underlying network connection's [net.Conn.RemoteAddr] method.
 // For Listener and Relay, the network connection of interest is the srcConn.
 // And for Dialer, the network connection of interest is the dstConn.
 func (c *Conn) RemoteAddr() net.Addr {
@@ -260,7 +260,7 @@ func (c *Conn) RemoteAddr() net.Addr {
 
 // SetDeadline implements the net.Conn interface.
 //
-// It calls to the underlying user-oriented connection's SetDeadline() method.
+// It calls to the underlying connections' [net.Conn.SetDeadline] method.
 func (c *Conn) SetDeadline(t time.Time) (err error) {
 	// SetDeadline is only available to Dialer/Listener. But not Relay.
 	if c.callerConn == nil {
@@ -289,7 +289,7 @@ func (c *Conn) SetDeadline(t time.Time) (err error) {
 
 // SetReadDeadline implements the net.Conn interface.
 //
-// It calls to the underlying user-oriented connection's SetReadDeadline() method.
+// It calls to the underlying user-oriented connection's [net.Conn.SetReadDeadline] method.
 func (c *Conn) SetReadDeadline(t time.Time) error {
 	// SetReadDeadline is only available to Dialer/Listener. But not Relay.
 	if c.callerConn == nil {
@@ -301,7 +301,7 @@ func (c *Conn) SetReadDeadline(t time.Time) error {
 
 // SetWriteDeadline implements the net.Conn interface.
 //
-// It calls to the underlying user-oriented connection's SetWriteDeadline() method.
+// It calls to the underlying user-oriented connection's [net.Conn.SetWriteDeadline] method.
 func (c *Conn) SetWriteDeadline(t time.Time) error {
 	// SetWriteDeadline is only available to Dialer/Listener. But not Relay.
 	if c.callerConn == nil {

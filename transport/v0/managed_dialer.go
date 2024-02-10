@@ -14,6 +14,7 @@ type ManagedDialer struct {
 	// mapFdClonedFile map[int32]*os.File // saves all files so GC won't close them
 }
 
+// NewManagedDialer creates a new ManagedDialer.
 func NewManagedDialer(network, address string, dialerFunc func(network, address string) (net.Conn, error)) *ManagedDialer {
 	return &ManagedDialer{
 		network:    network,
@@ -22,7 +23,7 @@ func NewManagedDialer(network, address string, dialerFunc func(network, address 
 	}
 }
 
-// dial(apw i32) -> fd i32
+// Dial dials the network address using the dialerFunc of the ManagedDialer.
 func (md *ManagedDialer) Dial() (net.Conn, error) {
 	return md.dialerFunc(md.network, md.address)
 }

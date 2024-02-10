@@ -161,10 +161,23 @@ type core struct {
 //
 // It uses the default implementation of interface.Core as
 // defined in this file.
+//
+// Deprecated: use [NewCoreWithContext] instead.
 func NewCore(config *Config) (Core, error) {
 	return NewCoreWithContext(context.Background(), config)
 }
 
+// NewCoreWithContext creates a new Core with the given context and config.
+//
+// It uses the default implementation of interface.Core as
+// defined in this file.
+//
+// The context is used to control the lifetime of the call to
+// function calls into the WebAssembly module. If the context
+// is canceled or reaches its deadline, any current and future
+// function call will return with an error. Call
+// [WazeroRuntimeConfigFactory.SetCloseOnContextDone] with false
+// to disable this behavior.
 func NewCoreWithContext(ctx context.Context, config *Config) (Core, error) {
 	var err error
 

@@ -25,9 +25,9 @@ type Listener struct {
 	water.UnimplementedListener // embedded to ensure forward compatibility
 }
 
-// NewListener creates a new Listener.
+// NewListener creates a new [water.Listener] from the given [water.Config].
 //
-// Deprecated: use NewListenerWithContext instead.
+// Deprecated: use [NewListenerWithContext] instead.
 func NewListener(c *water.Config) (water.Listener, error) {
 	return &Listener{
 		config: c.Clone(),
@@ -35,7 +35,15 @@ func NewListener(c *water.Config) (water.Listener, error) {
 	}, nil
 }
 
-// NewListenerWithContext creates a new Listener with the given context.
+// NewListenerWithContext creates a new [water.Listener] from the [water.Config] with
+// the given [context.Context].
+//
+// The context is passed to [water.NewCoreWithContext] to control the lifetime of
+// the call to function calls into the WebAssembly module.
+// If the context is canceled or reaches its deadline, any current and future
+// function call will return with an error.
+// Call [water.WazeroRuntimeConfigFactory.SetCloseOnContextDone] with false to
+// disable this behavior.
 func NewListenerWithContext(ctx context.Context, c *water.Config) (water.Listener, error) {
 	return &Listener{
 		config: c.Clone(),
@@ -51,14 +59,14 @@ func NewListenerWithContext(ctx context.Context, c *water.Config) (water.Listene
 // the inbound connection with a wrapping transport protocol handled
 // by the WASM module.
 //
-// Implements net.Listener.
+// Implements [net.Listener].
 func (l *Listener) Accept() (net.Conn, error) {
 	return l.AcceptWATER()
 }
 
 // Close closes the listener.
 //
-// Implements net.Listener.
+// Implements [net.Listener].
 func (l *Listener) Close() error {
 	if l.closed.CompareAndSwap(false, true) {
 		return l.config.NetworkListener.Close()
@@ -68,13 +76,15 @@ func (l *Listener) Close() error {
 
 // Addr returns the listener's network address.
 //
-// Implements net.Listener.
+// Implements [net.Listener].
 func (l *Listener) Addr() net.Addr {
 	return l.config.NetworkListener.Addr()
 }
 
 // AcceptWATER waits for and returns the next connection to the listener
 // as a water.Conn.
+//
+// Implements [water.Listener].
 func (l *Listener) AcceptWATER() (water.Conn, error) {
 	if l.closed.Load() {
 		return nil, fmt.Errorf("water: listener is closed")

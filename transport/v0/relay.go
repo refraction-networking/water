@@ -27,17 +27,24 @@ type Relay struct {
 	water.UnimplementedRelay // embedded to ensure forward compatibility
 }
 
-// NewRelay creates a relay with the given Config without starting
-// it. To start the relay, call [RelayTo] or [ListenAndRelayTo].
+// NewRelay creates a new [water.Relay] from the given [water.Config] without starting
+// it. To start the relay, call [Relay.RelayTo] or [Relay.ListenAndRelayTo].
 //
-// Deprecated: use NewRelayWithContext instead.
+// Deprecated: use [NewRelayWithContext] instead.
 func NewRelay(c *water.Config) (water.Relay, error) {
 	return NewRelayWithContext(context.Background(), c)
 }
 
-// NewRelayWithContext creates a relay with the given Config and
-// context without starting it. To start the relay, call [RelayTo]
-// or [ListenAndRelayTo].
+// NewRelayWithContext creates a new [water.Relay] from the [water.Config] with the given
+// [context.Context] without starting it. To start the relay, call [Relay.RelayTo]
+// or [Relay.ListenAndRelayTo].
+//
+// The context is passed to [water.NewCoreWithContext] to control the lifetime of
+// the call to function calls into the WebAssembly module.
+// If the context is canceled or reaches its deadline, any current and future
+// function call will return with an error.
+// Call [water.WazeroRuntimeConfigFactory.SetCloseOnContextDone] with false to
+// disable this behavior.
 func NewRelayWithContext(ctx context.Context, c *water.Config) (water.Relay, error) {
 	return &Relay{
 		config:  c.Clone(),
@@ -46,7 +53,7 @@ func NewRelayWithContext(ctx context.Context, c *water.Config) (water.Relay, err
 	}, nil
 }
 
-// RelayTo implements Relay.RelayTo().
+// RelayTo implements [water.Relay].
 func (r *Relay) RelayTo(network, address string) error {
 	if !r.running.CompareAndSwap(false, true) {
 		return water.ErrRelayAlreadyStarted
@@ -79,7 +86,7 @@ func (r *Relay) RelayTo(network, address string) error {
 	return nil
 }
 
-// ListenAndRelayTo implements Relay.ListenAndRelayTo().
+// ListenAndRelayTo implements [water.Relay].
 func (r *Relay) ListenAndRelayTo(lnetwork, laddress, rnetwork, raddress string) error {
 	if !r.running.CompareAndSwap(false, true) {
 		return water.ErrRelayAlreadyStarted
@@ -121,6 +128,7 @@ func (r *Relay) ListenAndRelayTo(lnetwork, laddress, rnetwork, raddress string) 
 	return nil
 }
 
+// Close implements [water.Relay].
 func (r *Relay) Close() error {
 	if !r.running.CompareAndSwap(true, false) {
 		return nil
@@ -133,7 +141,7 @@ func (r *Relay) Close() error {
 	return fmt.Errorf("water: relay is not configured")
 }
 
-// Addr implements Relay.Addr().
+// Addr implements [water.Relay].
 func (r *Relay) Addr() net.Addr {
 	if r.config == nil {
 		return nil
