@@ -1,6 +1,7 @@
 package v0
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"runtime"
@@ -651,7 +652,7 @@ func (tm *TransportModule) Worker() error {
 	go func() {
 		defer close(tm.backgroundWorker.chanWorkerErr)
 		_, err := tm.backgroundWorker._worker()
-		if err != nil {
+		if err != nil && !errors.Is(err, syscall.ECANCELED) {
 			// multiple copies in case of multiple receivers on the channel
 			tm.backgroundWorker.chanWorkerErr <- err
 			tm.backgroundWorker.chanWorkerErr <- err
@@ -659,7 +660,7 @@ func (tm *TransportModule) Worker() error {
 			tm.backgroundWorker.chanWorkerErr <- err
 			return
 		} else {
-			log.LDebugf(tm.Core().Logger(), "water: worker thread exited with code 0")
+			log.LDebugf(tm.Core().Logger(), "water: worker thread exited normally")
 		}
 	}()
 

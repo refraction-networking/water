@@ -44,8 +44,6 @@ var (
 	ErrListenerAlreadyRegistered = errors.New("water: listener already registered")
 	ErrListenerVersionNotFound   = errors.New("water: listener version not found")
 	ErrUnimplementedListener     = errors.New("water: unimplemented Listener")
-
-	_ Listener = (*UnimplementedListener)(nil) // type guard
 )
 
 // UnimplementedListener is a Listener that always returns errors.
@@ -53,33 +51,21 @@ var (
 // It is used to ensure forward compatibility of the Listener interface.
 type UnimplementedListener struct{}
 
-// Accept implements net.Listener.Accept().
-func (*UnimplementedListener) Accept() (net.Conn, error) {
-	return nil, ErrUnimplementedListener
-}
-
-// Close implements net.Listener.Close().
-func (*UnimplementedListener) Close() error {
-	return ErrUnimplementedListener
-}
-
-// Addr implements net.Listener.Addr().
-func (*UnimplementedListener) Addr() net.Addr {
-	return nil
-}
-
 // AcceptWATER implements water.Listener.AcceptWATER().
 func (*UnimplementedListener) AcceptWATER() (Conn, error) {
 	return nil, ErrUnimplementedListener
 }
 
 // mustEmbedUnimplementedListener is a function that developers cannot
-func (*UnimplementedListener) mustEmbedUnimplementedListener() {}
+func (*UnimplementedListener) mustEmbedUnimplementedListener() {} //nolint:unused
 
-// RegisterListener registers a Listener function for the given version to
-// the global registry. Only registered versions can be recognized and
-// used by NewListener().
-func RegisterListener(version string, listener newListenerFunc) error {
+// RegisterWATMListener is a function used by Transport Module drivers
+// (e.g., `transport/v0`) to register a function that spawns a new [Listener]
+// from a given [Config] for a specific version. Renamed from RegisterListener.
+//
+// This is not a part of WATER API and should not be used by developers
+// wishing to integrate WATER into their applications.
+func RegisterWATMListener(version string, listener newListenerFunc) error {
 	if _, ok := knownListenerVersions[version]; ok {
 		return ErrListenerAlreadyRegistered
 	}
@@ -92,7 +78,7 @@ func RegisterListener(version string, listener newListenerFunc) error {
 // It automatically detects the version of the WebAssembly Transport
 // Module specified in the config.
 //
-// Deprecated: use NewListenerWithContext instead.
+// Deprecated: use [NewListenerWithContext] instead.
 func NewListener(c *Config) (Listener, error) {
 	return NewListenerWithContext(context.Background(), c)
 }

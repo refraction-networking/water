@@ -111,8 +111,13 @@ type Core interface {
 	//
 	// It is recommended that this function only to be invoked if
 	// the WATM expects the WASI preview1 API to be available.
+	//
+	// Note that at the time of writing, all WATM implementations
+	// expect the WASI preview1 API to be available.
 	WASIPreview1() error
 
+	// Logger returns the logger used by the Core. If not set, it
+	// should return the default global logger instead of nil.
 	Logger() *log.Logger
 }
 
@@ -129,7 +134,7 @@ var _ Core = (*core)(nil)
 // to breaking changes unless a severe bug needs to be fixed
 // in such a breaking manner inevitably.
 //
-// Implements Core.
+// This struct implements Core.
 type core struct {
 	// config
 	config *Config

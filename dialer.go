@@ -20,7 +20,7 @@ import (
 type Dialer interface {
 	// Dial dials the remote network address and returns a net.Conn.
 	//
-	// Deprecated: use DialContext instead.
+	// It is recommended to use DialContext instead of Dial.
 	Dial(network, address string) (Conn, error)
 
 	// DialContext dials the remote network address with the given context
@@ -60,12 +60,15 @@ func (*UnimplementedDialer) DialContext(_ context.Context, _, _ string) (Conn, e
 // mustEmbedUnimplementedDialer is a function that developers cannot
 // manually implement. It is used to ensure forward compatibility of
 // the Dialer interface.
-func (*UnimplementedDialer) mustEmbedUnimplementedDialer() {}
+func (*UnimplementedDialer) mustEmbedUnimplementedDialer() {} //nolint:unused
 
-// RegisterDialer registers a dialer function for the given version to
-// the global registry. Only registered versions can be recognized and
-// used by NewDialer().
-func RegisterDialer(version string, dialer newDialerFunc) error {
+// RegisterWATMDialer is a function used by Transport Module drivers
+// (e.g., `transport/v0`) to register a function that spawns a new [Dialer]
+// from a given [Config] for a specific version. Renamed from RegisterDialer.
+//
+// This is not a part of WATER API and should not be used by developers
+// wishing to integrate WATER into their applications.
+func RegisterWATMDialer(version string, dialer newDialerFunc) error {
 	if _, ok := knownDialerVersions[version]; ok {
 		return ErrDialerAlreadyRegistered
 	}
