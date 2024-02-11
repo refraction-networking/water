@@ -97,7 +97,7 @@ func NewListener(c *Config) (Listener, error) {
 // Call [WazeroRuntimeConfigFactory.SetCloseOnContextDone] with false to disable
 // this behavior.
 func NewListenerWithContext(ctx context.Context, c *Config) (Listener, error) {
-	core, err := NewCoreWithContext(context.Background(), c)
+	core, err := NewCoreWithContext(ctx, c)
 	if err != nil {
 		return nil, err
 	}
