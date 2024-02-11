@@ -104,7 +104,7 @@ connection.
 		TransportModuleBin: wasm,
 	}
 
-	dialer, _ := water.NewDialer(config)
+	dialer, _ := water.NewDialerWithContext(context.Background(), config)
 	conn, _ := dialer.DialContext(context.Background(),"tcp", remoteAddr)
 	// ...
 ```
