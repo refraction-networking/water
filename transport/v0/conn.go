@@ -9,9 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gaukas/water"
-	"github.com/gaukas/water/internal/log"
-	"github.com/gaukas/water/internal/socket"
+	"github.com/refraction-networking/water"
+	"github.com/refraction-networking/water/internal/log"
+	"github.com/refraction-networking/water/internal/socket"
 )
 
 // Conn is the first experimental version of Conn implementation.

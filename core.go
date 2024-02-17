@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/gaukas/water/internal/log"
+	"github.com/refraction-networking/water/internal/log"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"

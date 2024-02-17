@@ -1,8 +1,8 @@
 # W.A.T.E.R.: WebAssembly Transport Executables Runtime
-[![License](https://img.shields.io/github/license/gaukas/water)](https://github.com/gaukas/water/blob/master/LICENSE)
-[![FOSSA](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgaukas%2Fwater.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgaukas%2Fwater?ref=badge_shield&issueType=license)
-[![CI](https://github.com/gaukas/water/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/gaukas/water/actions/workflows/go.yml)
-[![Go Doc](https://pkg.go.dev/badge/github.com/gaukas/water.svg)](https://pkg.go.dev/github.com/gaukas/water)
+[![License](https://img.shields.io/github/license/gaukas/water)](https://github.com/refraction-networking/water/blob/master/LICENSE)
+[![FOSSA](https://app.fossa.com/api/projects/git%2Bgithub.com%2Frefraction-networking%2Fwater.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Frefraction-networking%2Fwater?ref=badge_shield&issueType=license)
+[![CI](https://github.com/refraction-networking/water/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/refraction-networking/water/actions/workflows/go.yml)
+[![Go Doc](https://pkg.go.dev/badge/github.com/refraction-networking/water.svg)](https://pkg.go.dev/github.com/refraction-networking/water)
 
 <div style="width: 100%; height = 160px">
     <div style="width: 75%; height: 150px; float: left;"> 
@@ -21,31 +21,33 @@
 
 To build a WATM in Go, please refer to [watm](https://github.com/gaukas/watm) for examples and helper libraries interfacing Pluggable Transports-like interfaces. Official Go compiler is currently not supported ([watm#4](https://github.com/gaukas/watm/issues/4)).
 
-You can contact one of developers personally via gaukas.wang@colorado.edu, or simply [opening an issue](https://github.com/gaukas/water/issues/new). 
+You can contact one of developers personally via gaukas.wang@colorado.edu, or simply [opening an issue](https://github.com/refraction-networking/water/issues/new). 
 
-The Rust implementation of the runtime library and information about writing, building, and using WebAssembly Transport Modules(WATM) from Rust can be found in [water-rs](https://github.com/erikziyunchi/water-rs). 
+The Rust implementation of the runtime library and information about writing, building, and using WebAssembly Transport Modules(WATM) from Rust can be found in [water-rs](https://github.com/refraction-networking/water-rs). 
 
 ### Cite our work
 
-If you quoted or used our work in your own project/paper/research, please cite our paper [Just add WATER: WebAssembly-based Circumvention Transports](https://arxiv.org/pdf/2312.00163.pdf).
+If you quoted or used our work in your own project/paper/research, please cite our paper [Just add WATER: WebAssembly-based Circumvention Transports](https://www.petsymposium.org/foci/2024/foci-2024-0003.pdf), which is published in the proceedings of Free and Open Communications on the Internet (FOCI) in 2024 issue 1, pages 22-28.
 
 <details>
   <summary>BibTeX</summary>
     
   ```bibtex
-  @inproceedings{water-foci24,
-	  author = {Chi, Erik and Wang, Gaukas and Halderman, J. Alex and Wustrow, Eric and Wampler, Jack},
-	  year = {2024},
-	  month = {02},
-	  title = {Just add {WATER}: {WebAssembly}-based Circumvention Transports},
-	  address = {Virtual Event},
-	  series = {FOCI '24},
-	  booktitle = {Free and Open Communications on the Internet},
-  }
+    @inproceedings{water-foci24,
+        author = {Chi, Erik and Wang, Gaukas and Halderman, J. Alex and Wustrow, Eric and Wampler, Jack},
+        year = {2024},
+        month = {02},
+        number = {1},
+        pages = {22-28},
+        title = {Just add {WATER}: {WebAssembly}-based Circumvention Transports},
+        howpublished = "\url{https://www.petsymposium.org/foci/2024/foci-2024-0003.php}",
+        publisher = {PoPETs},
+        address = {Virtual Event},
+        series = {FOCI '24},
+        booktitle = {Free and Open Communications on the Internet},
+    }
   ```
 </details>
-
-**Update**: our paper has been accepted by FOCI and will appear at [FOCI 2024](https://foci.community/foci24.html) on Feb 19, 2024! 
 
 ## Be Water
 
@@ -70,7 +72,7 @@ W.A.T.E.R. is designed to be future-proof with the automated multi-version WebAs
 import (
 	// ...
 
-	_ "github.com/gaukas/water/transport/v0"
+	_ "github.com/refraction-networking/water/transport/v0"
 
 	// ...
 )

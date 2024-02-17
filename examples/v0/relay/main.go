@@ -7,8 +7,8 @@ import (
 	"net"
 	"os"
 
-	"github.com/gaukas/water"
-	_ "github.com/gaukas/water/transport/v0"
+	"github.com/refraction-networking/water"
+	_ "github.com/refraction-networking/water/transport/v0"
 )
 
 var (

@@ -9,7 +9,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/gaukas/water/internal/log"
+	"github.com/refraction-networking/water/internal/log"
 )
 
 // UnixConnPair returns a pair of connected net.UnixConn.

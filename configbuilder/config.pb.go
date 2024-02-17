@@ -1,6 +1,6 @@
 package configbuilder
 
-import "github.com/gaukas/water/configbuilder/pb"
+import "github.com/refraction-networking/water/configbuilder/pb"
 
 // ConfigProtoBuf defines the Protobuf format of the Config.
 //

@@ -7,8 +7,8 @@ import (
 	"net"
 	"os"
 
-	"github.com/gaukas/water/configbuilder"
-	"github.com/gaukas/water/internal/log"
+	"github.com/refraction-networking/water/configbuilder"
+	"github.com/refraction-networking/water/internal/log"
 	"google.golang.org/protobuf/proto"
 )
 

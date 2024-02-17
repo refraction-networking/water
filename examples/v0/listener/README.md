@@ -7,7 +7,7 @@ This is an example of using `water.Listener` with any v0 WATM.
 ### Install
 
 ```bash
-go get github.com/gaukas/water/examples/v0/listener
+go get github.com/refraction-networking/water/examples/v0/listener
 ```
 
 ### Run

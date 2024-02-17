@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/gaukas/water"
-	v0 "github.com/gaukas/water/transport/v0"
+	"github.com/refraction-networking/water"
+	v0 "github.com/refraction-networking/water/transport/v0"
 )
 
 // This file is specifically designed to test to make sure everything will eventually be

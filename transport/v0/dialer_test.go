@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gaukas/water"
-	v0 "github.com/gaukas/water/transport/v0"
+	"github.com/refraction-networking/water"
+	v0 "github.com/refraction-networking/water/transport/v0"
 )
 
 // ExampleDialer demonstrates how to use v0.Dialer as a water.Dialer.

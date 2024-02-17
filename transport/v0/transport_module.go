@@ -8,10 +8,10 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/gaukas/water"
-	"github.com/gaukas/water/internal/log"
-	"github.com/gaukas/water/internal/socket"
-	"github.com/gaukas/water/internal/wasip1"
+	"github.com/refraction-networking/water"
+	"github.com/refraction-networking/water/internal/log"
+	"github.com/refraction-networking/water/internal/socket"
+	"github.com/refraction-networking/water/internal/wasip1"
 	"github.com/tetratelabs/wazero/api"
 )
 
