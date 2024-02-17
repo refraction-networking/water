@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gaukas/water/internal/socket"
+	"github.com/refraction-networking/water/internal/socket"
 )
 
 func TestTCPConnPair(t *testing.T) {

@@ -7,7 +7,7 @@ This is an example of using `water.Relay` with any v0 WATM.
 ### Install
 
 ```bash
-go get github.com/gaukas/water/examples/v0/relay
+go get github.com/refraction-networking/water/examples/v0/relay
 ```
 
 ### Run

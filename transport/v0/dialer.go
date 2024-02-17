@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gaukas/water"
+	"github.com/refraction-networking/water"
 )
 
 func init() {

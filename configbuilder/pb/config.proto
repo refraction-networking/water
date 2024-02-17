@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package water;
 
-option go_package = "github.com/gaukas/water/configbuilder/pb";
+option go_package = "github.com/refraction-networking/water/configbuilder/pb";
 
 message Config {
     TransportModule transport_module = 1;

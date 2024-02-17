@@ -8,7 +8,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/gaukas/water/internal/log"
+	"github.com/refraction-networking/water/internal/log"
 )
 
 // TCPConnPair returns a pair of connected net.TCPConn.

@@ -6,7 +6,7 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/gaukas/water"
+	"github.com/refraction-networking/water"
 )
 
 func init() {

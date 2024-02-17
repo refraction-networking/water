@@ -6,9 +6,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gaukas/water/internal/log"
+	"github.com/refraction-networking/water/internal/log"
 
-	"github.com/gaukas/water"
+	"github.com/refraction-networking/water"
 )
 
 func TestConfig_Clone(t *testing.T) {

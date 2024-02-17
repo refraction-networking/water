@@ -9,9 +9,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/gaukas/water"
-	"github.com/gaukas/water/internal/log"
-	_ "github.com/gaukas/water/transport/v0"
+	"github.com/refraction-networking/water"
+	"github.com/refraction-networking/water/internal/log"
+	_ "github.com/refraction-networking/water/transport/v0"
 )
 
 var (

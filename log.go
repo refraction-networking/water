@@ -1,7 +1,7 @@
 package water
 
 import (
-	"github.com/gaukas/water/internal/log"
+	"github.com/refraction-networking/water/internal/log"
 )
 
 // SetDefaultLogger sets the logger to be used by the package

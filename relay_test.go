@@ -6,8 +6,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/gaukas/water"
-	_ "github.com/gaukas/water/transport/v0"
+	"github.com/refraction-networking/water"
+	_ "github.com/refraction-networking/water/transport/v0"
 )
 
 // ExampleRelay demonstrates how to use water.Relay.

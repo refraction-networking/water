@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gaukas/water"
-	v0 "github.com/gaukas/water/transport/v0"
+	"github.com/refraction-networking/water"
+	v0 "github.com/refraction-networking/water/transport/v0"
 )
 
 // ExampleListener demonstrates how to use v0.Listener as a water.Listener.
