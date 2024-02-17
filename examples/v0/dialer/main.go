@@ -38,15 +38,15 @@ func main() {
 	config.ModuleConfig().InheritStdout()
 	config.ModuleConfig().InheritStderr()
 
-	dialer, err := water.NewDialer(config)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create dialer: %v", err))
-	}
-
 	ctx := context.Background()
 	// // optional: enable wazero logging
 	// ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{},
 	// 	logging.NewHostLoggingListenerFactory(os.Stderr, logging.LogScopeFilesystem|logging.LogScopePoll|logging.LogScopeSock))
+
+	dialer, err := water.NewDialerWithContext(ctx, config)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create dialer: %v", err))
+	}
 
 	conn, err := dialer.DialContext(ctx, "tcp", *remoteAddr)
 	if err != nil {

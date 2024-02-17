@@ -40,6 +40,7 @@ func TransportModuleConfigFromFile(filePath string) (TransportModuleConfig, erro
 	return transportModuleConfigFile(filePath), nil
 }
 
+// AsFile implements TransportModuleConfig.
 func (c transportModuleConfigFile) AsFile() (*os.File, error) {
 	if string(c) == "" {
 		return nil, errors.New("transport module config file path is empty")
@@ -61,6 +62,7 @@ func TransportModuleConfigFromBytes(configBytes []byte) TransportModuleConfig {
 	return transportModuleConfigBytes(configBytes)
 }
 
+// AsFile implements TransportModuleConfig.
 func (c transportModuleConfigBytes) AsFile() (*os.File, error) {
 	if len(c) == 0 {
 		return nil, errors.New("transport module config bytes is empty")

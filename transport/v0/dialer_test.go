@@ -20,7 +20,7 @@ func ExampleDialer() {
 		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 
-	waterDialer, err := v0.NewDialer(config)
+	waterDialer, err := v0.NewDialerWithContext(context.Background(), config)
 	if err != nil {
 		panic(err)
 	}
@@ -87,7 +87,7 @@ func testDialerBadAddr(t *testing.T) {
 		TransportModuleBin: wasmPlain,
 	}
 
-	dialer, err := water.NewDialer(config)
+	dialer, err := v0.NewDialerWithContext(context.Background(), config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 	config := &water.Config{
 		TransportModuleBin: wasmPlain,
 	}
-	dialer, err := v0.NewDialer(config)
+	dialer, err := v0.NewDialerWithContext(context.Background(), config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +234,7 @@ func testDialerReverse(t *testing.T) { // skipcq: GO-R1005
 	config := &water.Config{
 		TransportModuleBin: wasmReverse,
 	}
-	dialer, err := water.NewDialer(config)
+	dialer, err := v0.NewDialerWithContext(context.Background(), config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +378,7 @@ func BenchmarkDialerOutbound(b *testing.B) {
 	config := &water.Config{
 		TransportModuleBin: wasmPlain,
 	}
-	dialer, err := water.NewDialer(config)
+	dialer, err := v0.NewDialerWithContext(context.Background(), config)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -434,7 +434,7 @@ func BenchmarkDialerOutboundReverse(b *testing.B) {
 	config := &water.Config{
 		TransportModuleBin: wasmReverse,
 	}
-	dialer, err := water.NewDialer(config)
+	dialer, err := v0.NewDialerWithContext(context.Background(), config)
 	if err != nil {
 		b.Fatal(err)
 	}

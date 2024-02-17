@@ -223,6 +223,10 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		c.RuntimeConfig().Interpreter()
 	}
 
+	if confJson.Runtime.DoNotCloseOnContextDone {
+		c.RuntimeConfig().SetCloseOnContextDone(false)
+	}
+
 	return nil
 }
 
@@ -292,6 +296,10 @@ func (c *Config) UnmarshalProto(b []byte) error {
 
 	if confProto.GetRuntime().GetForceInterpreter() {
 		c.RuntimeConfig().Interpreter()
+	}
+
+	if confProto.GetRuntime().GetDoNotCloseOnContextDone() {
+		c.RuntimeConfig().SetCloseOnContextDone(false)
 	}
 
 	return nil

@@ -101,7 +101,7 @@ func RegisterWATMRelay(version string, relay newRelayFunc) error {
 	return nil
 }
 
-// NewRelay creates a new Relay from the config.
+// NewRelay creates a new [Relay] from the given [Config].
 //
 // It automatically detects the version of the WebAssembly Transport
 // Module specified in the config.
@@ -111,13 +111,21 @@ func NewRelay(c *Config) (Relay, error) {
 	return NewRelayWithContext(context.Background(), c)
 }
 
-// NewRelayWithContext creates a new Relay from the config with
-// the given context.
+// NewRelayWithContext creates a new [Relay] from the [Config] with
+// the given [context.Context].
 //
 // It automatically detects the version of the WebAssembly Transport
 // Module specified in the config.
+//
+// The context is passed to [NewCoreWithContext] and the registered versioned
+// relay creation function to control the lifetime of the call to function
+// calls into the WebAssembly module.
+// If the context is canceled or reaches its deadline, any current and future
+// function call will return with an error.
+// Call [WazeroRuntimeConfigFactory.SetCloseOnContextDone] with false to disable
+// this behavior.
 func NewRelayWithContext(ctx context.Context, c *Config) (Relay, error) {
-	core, err := NewCore(c)
+	core, err := NewCoreWithContext(ctx, c)
 	if err != nil {
 		return nil, err
 	}

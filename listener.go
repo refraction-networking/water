@@ -73,7 +73,7 @@ func RegisterWATMListener(version string, listener newListenerFunc) error {
 	return nil
 }
 
-// NewListener creates a new Listener from the config.
+// NewListener creates a new [Listener] from the given [Config].
 //
 // It automatically detects the version of the WebAssembly Transport
 // Module specified in the config.
@@ -83,12 +83,21 @@ func NewListener(c *Config) (Listener, error) {
 	return NewListenerWithContext(context.Background(), c)
 }
 
-// NewListenerWithContext creates a new Listener from the config with
-// the given context.
+// NewListenerWithContext creates a new [Listener] from the [Config] with
+// the given [context.Context].
 //
 // It automatically detects the version of the WebAssembly Transport
+// Module specified in the config.
+//
+// The context is passed to [NewCoreWithContext] and the registered versioned
+// listener creation function to control the lifetime of the call to function
+// calls into the WebAssembly module.
+// If the context is canceled or reaches its deadline, any current and future
+// function call will return with an error.
+// Call [WazeroRuntimeConfigFactory.SetCloseOnContextDone] with false to disable
+// this behavior.
 func NewListenerWithContext(ctx context.Context, c *Config) (Listener, error) {
-	core, err := NewCore(c)
+	core, err := NewCoreWithContext(ctx, c)
 	if err != nil {
 		return nil, err
 	}

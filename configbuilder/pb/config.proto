@@ -23,7 +23,7 @@ message Network {
 message Listener {
     string network = 1;
     string address = 2; // ip:port
-}    
+}
 
 message Module {
     repeated string argv = 1; // warning: this is not a recommended way to pass configuration parameters to the module, use transport_module.config instead. 
@@ -35,5 +35,6 @@ message Module {
 }
 
 message Runtime {
-    bool force_interpreter = 1;    
+    bool force_interpreter = 1;
+    bool do_not_close_on_context_done = 2;
 }

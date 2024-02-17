@@ -30,7 +30,7 @@ type Dialer interface {
 	mustEmbedUnimplementedDialer()
 }
 
-type newDialerFunc func(*Config) (Dialer, error)
+type newDialerFunc func(context.Context, *Config) (Dialer, error)
 
 var (
 	knownDialerVersions = make(map[string]newDialerFunc)
@@ -76,12 +76,34 @@ func RegisterWATMDialer(version string, dialer newDialerFunc) error {
 	return nil
 }
 
-// NewDialer creates a new Dialer from the config.
+// NewDialer creates a new [Dialer] from the given [Config].
 //
 // It automatically detects the version of the WebAssembly Transport
 // Module specified in the config.
+//
+// Deprecated: use NewDialerWithContext instead.
 func NewDialer(c *Config) (Dialer, error) {
-	core, err := NewCore(c)
+	return NewDialerWithContext(context.Background(), c)
+}
+
+// NewDialerWithContext creates a new [Dialer] from the [Config] with
+// the given [context.Context].
+//
+// It automatically detects the version of the WebAssembly Transport
+// Module specified in the config.
+//
+// The context is passed to [NewCoreWithContext] and the registered versioned
+// dialer creation function to control the lifetime of the call to function
+// calls into the WebAssembly module.
+// If the context is canceled or reaches its deadline, any current and future
+// function call will return with an error.
+// Call [WazeroRuntimeConfigFactory.SetCloseOnContextDone] with false to disable
+// this behavior.
+//
+// The context SHOULD be used as the default context for call to [Dialer.Dial]
+// by the dialer implementation.
+func NewDialerWithContext(ctx context.Context, c *Config) (Dialer, error) {
+	core, err := NewCoreWithContext(ctx, c)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +115,7 @@ func NewDialer(c *Config) (Dialer, error) {
 	// in a more organized way.
 	for exportName := range core.Exports() {
 		if f, ok := knownDialerVersions[exportName]; ok {
-			return f(c)
+			return f(ctx, c)
 		}
 	}
 

@@ -58,9 +58,11 @@ func (wmcf *WazeroModuleConfigFactory) SetArgv(argv []string) {
 //
 // Warning: this isn't a recommended way to pass configuration to the
 // WebAssembly module. Instead, use TransportModuleConfig for a serializable
-// configuration file.
+// configuration file. Currently, this function is not implemented and will
+// panic.
 func (wmcf *WazeroModuleConfigFactory) InheritArgv() {
 	// TODO: enumerate os.Args or deprecate this
+	panic("water: InheritArgv: not implemented yet")
 }
 
 // SetEnv sets the environment variables for the WebAssembly module.
@@ -83,35 +85,44 @@ func (wmcf *WazeroModuleConfigFactory) SetEnv(keys, values []string) {
 //
 // Warning: this isn't a recommended way to pass configuration to the
 // WebAssembly module. Instead, use TransportModuleConfig for a serializable
-// configuration file.
+// configuration file. Currently, this function is not implemented and will
+// panic.
 func (wmcf *WazeroModuleConfigFactory) InheritEnv() {
 	// TODO: enumerate os.Environ or deprecate this
+	panic("water: InheritEnv: not implemented yet")
 }
 
+// SetStdin sets the standard input for the WebAssembly module.
 func (wmcf *WazeroModuleConfigFactory) SetStdin(r io.Reader) {
 	wmcf.moduleConfig = wmcf.moduleConfig.WithStdin(r)
 }
 
+// InheritStdin sets the standard input for the WebAssembly module to os.Stdin.
 func (wmcf *WazeroModuleConfigFactory) InheritStdin() {
 	wmcf.moduleConfig = wmcf.moduleConfig.WithStdin(os.Stdin)
 }
 
+// SetStdout sets the standard output for the WebAssembly module.
 func (wmcf *WazeroModuleConfigFactory) SetStdout(w io.Writer) {
 	wmcf.moduleConfig = wmcf.moduleConfig.WithStdout(w)
 }
 
+// InheritStdout sets the standard output for the WebAssembly module to os.Stdout.
 func (wmcf *WazeroModuleConfigFactory) InheritStdout() {
 	wmcf.moduleConfig = wmcf.moduleConfig.WithStdout(os.Stdout)
 }
 
+// SetStderr sets the standard error for the WebAssembly module.
 func (wmcf *WazeroModuleConfigFactory) SetStderr(w io.Writer) {
 	wmcf.moduleConfig = wmcf.moduleConfig.WithStderr(w)
 }
 
+// InheritStderr sets the standard error for the WebAssembly module to os.Stderr.
 func (wmcf *WazeroModuleConfigFactory) InheritStderr() {
 	wmcf.moduleConfig = wmcf.moduleConfig.WithStderr(os.Stderr)
 }
 
+// SetPreopenDir sets the preopened directory for the WebAssembly module.
 func (wmcf *WazeroModuleConfigFactory) SetPreopenDir(path string, guestPath string) {
 	wmcf.fsconfig = wmcf.fsconfig.WithDirMount(path, guestPath)
 }
@@ -128,11 +139,12 @@ type WazeroRuntimeConfigFactory struct {
 // NewWazeroRuntimeConfigFactory creates a new WazeroRuntimeConfigFactory.
 func NewWazeroRuntimeConfigFactory() *WazeroRuntimeConfigFactory {
 	return &WazeroRuntimeConfigFactory{
-		runtimeConfig:    wazero.NewRuntimeConfig(),
+		runtimeConfig:    wazero.NewRuntimeConfig().WithCloseOnContextDone(true),
 		compilationCache: nil,
 	}
 }
 
+// Clone returns a copy of the WazeroRuntimeConfigFactory.
 func (wrcf *WazeroRuntimeConfigFactory) Clone() *WazeroRuntimeConfigFactory {
 	if wrcf == nil {
 		return nil
@@ -157,12 +169,33 @@ func (wrcf *WazeroRuntimeConfigFactory) GetConfig() wazero.RuntimeConfig {
 	}
 }
 
+// Interpreter sets the WebAssembly module to run in the interpreter mode.
+// In this mode, the WebAssembly module will run slower but it is available
+// on all architectures/platforms.
+//
+// If no mode is set, the WebAssembly module will run in the compiler mode if
+// supported, otherwise it will run in the interpreter mode.
 func (wrcf *WazeroRuntimeConfigFactory) Interpreter() {
 	wrcf.runtimeConfig = wazero.NewRuntimeConfigInterpreter()
 }
 
+// Compiler sets the WebAssembly module to run in the compiler mode.
+// It may bring performance improvements, but meanwhile it will cause
+// the program to panic if the architecture/platform is not supported.
+//
+// If no mode is set, the WebAssembly module will run in the compiler mode if
+// supported, otherwise it will run in the interpreter mode.
 func (wrcf *WazeroRuntimeConfigFactory) Compiler() {
 	wrcf.runtimeConfig = wazero.NewRuntimeConfigCompiler()
+}
+
+// SetCloseOnContextDone sets the closeOnContextDone for the WebAssembly module.
+// It closes the module when the context is done and prevents any further calls
+// to the module, including all exported functions.
+//
+// By default it is set to true.
+func (wrcf *WazeroRuntimeConfigFactory) SetCloseOnContextDone(close bool) {
+	wrcf.runtimeConfig = wrcf.runtimeConfig.WithCloseOnContextDone(close)
 }
 
 // SetCompilationCache sets the CompilationCache for the WebAssembly module.
