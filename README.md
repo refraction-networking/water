@@ -19,7 +19,7 @@
     </div>
 </div>
 
-To build a WATM in Go, please refer to [watm](https://github.com/gaukas/watm) for examples and helper libraries interfacing Pluggable Transports-like interfaces. Official Go compiler is currently not supported ([watm#4](https://github.com/gaukas/watm/issues/4)).
+To build a WATM in Go, please refer to [watm](https://github.com/refraction-networking/water/watm) for examples and helper libraries interfacing Pluggable Transports-like interfaces. Official Go compiler is currently not supported until further notice.
 
 You can contact one of developers personally via gaukas.wang@colorado.edu, or simply [opening an issue](https://github.com/refraction-networking/water/issues/new). 
 
