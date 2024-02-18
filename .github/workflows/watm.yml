@@ -19,7 +19,7 @@ env:
 
 jobs:
   watm_build_and_test:
-    name: "watm: go${{ matrix.go }} test"
+    name: "go${{ matrix.go }} test"
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -37,7 +37,7 @@ jobs:
         working-directory: ./watm
 
   watm_build_tinygo_v0_examples:
-    name: "watm: build ${{ matrix.examples }}.v0.tinygo.wasm w/ tinygo ${{ matrix.tinygo }} (go${{ matrix.go }})"
+    name: "build ${{ matrix.examples }}.v0.tinygo.wasm w/ tinygo ${{ matrix.tinygo }} (go${{ matrix.go }})"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
