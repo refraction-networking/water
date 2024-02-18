@@ -7,12 +7,14 @@ on:
       - 'watm/**'
       - '**/*.md'
       - '**/LICENSE'
+      - '**/LICENSE-*'
   pull_request:
     branches: [ "master" ]
     paths-ignore:
       - 'watm/**'
       - '**/*.md'
       - '**/LICENSE'
+      - '**/LICENSE-*'
 
 env:
   CGO_ENABLED: 0
