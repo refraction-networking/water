@@ -1,4 +1,4 @@
-name: "Automatic Release"
+name: "Release"
 
 # Build only on new tags
 on:

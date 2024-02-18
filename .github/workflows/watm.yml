@@ -1,4 +1,4 @@
-name: "WATM Module on Push and Pull Request"
+name: "watm"
 
 on:
   push:

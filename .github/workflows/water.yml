@@ -1,4 +1,4 @@
-name: "WATER Runtime on Push and Pull Request"
+name: "water"
 
 on:
   push:
