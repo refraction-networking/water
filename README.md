@@ -171,6 +171,13 @@ to tunnel traffic.
 
 See [examples](./examples) for example usecase of W.A.T.E.R. API, including `Dialer`, `Listener` and `Relay`.
 
+# License
+
+This project is dual-licensed under both the Apache 2.0 license and the GPLv3 license. The license applies differently depending on how this project is used.
+
+- **Apache 2.0**: **ONLY** when this project is imported/used as-is bearing the name `water`, or being tested with a change that is intended to be contributed back to the `water` project later. 
+- **GPLv3** applies otherwise, which means if you modify, redistribute and rebrand this project in other projects WITHOUT using the name `water` or the change is considered private and not intended to be contributed back to the `water` project, you MUST also open source your modification under the GPLv3 license and forfeit the right to use the Apache 2.0 license.
+
 # Cross-platform Support
 
 W.A.T.E.R. is designed to be cross-platform (and cross-architecture). 

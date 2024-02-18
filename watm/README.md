@@ -8,8 +8,7 @@ This repository contains tools for building WebAssembly Transport Modules (WATMs
 
 ## Dual License
 
-This module is licensed under both the Apache 2.0 license and the GPLv3 license. 
+This module is licensed under both the Apache 2.0 license and the GPLv3 license, and the license applies differently depending on how this module is used. 
 
-When distributed along with the water project, including but not limited to by forking, cloning, or downloading the repository, the Apache 2.0 license applies. 
-
-When used to build a WATM that is not distributed along with the water project, i.e., when used as a library in your own project, the GPLv3 license applies.
+- **Apache 2.0**: **ONLY** when this module is distributed as a part of the `water` project, and used to build a WebAssembly Transport Module for the `water` project.
+- **GPLv3** applies otherwise, which means if you modify and redistribute this module or use it for a non-water scenario, you MUST also open source your modification under the GPLv3 license and forfeit the right to use the Apache 2.0 license.
