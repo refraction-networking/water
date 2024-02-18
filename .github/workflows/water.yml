@@ -5,14 +5,14 @@ on:
     branches: [ "master" ]
     paths-ignore:
       - 'watm/**'
-      - '**/*.md'
+      - '**.md'
       - '**/LICENSE'
       - '**/LICENSE-*'
   pull_request:
     branches: [ "master" ]
     paths-ignore:
       - 'watm/**'
-      - '**/*.md'
+      - '**.md'
       - '**/LICENSE'
       - '**/LICENSE-*'
 

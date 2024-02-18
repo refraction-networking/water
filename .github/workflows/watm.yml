@@ -6,13 +6,14 @@ on:
     paths:
       - 'watm/**'
       - '!watm/*/snippets/**' # ignore changes to snippets since they are not part of the module
-      - '!watm/**/*.md' # ignore changes to markdown files since they are not part of the code
+      - '!**.md' # ignore changes to markdown files since they are not part of the code
   pull_request:
     branches: [ "master" ]
     paths:
       - 'watm/**'
       - '!watm/*/snippets/**' # ignore changes to snippets since they are not part of the module
-      - '!watm/**/*.md' # ignore changes to markdown files since they are not part of the code
+      - '!**.md' # ignore changes to markdown files since they are not part of the code
+
 env:
   CGO_ENABLED: 0
 
