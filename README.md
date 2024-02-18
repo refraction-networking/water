@@ -1,5 +1,6 @@
 # W.A.T.E.R.: WebAssembly Transport Executables Runtime
-[![License](https://img.shields.io/github/license/gaukas/water)](https://github.com/refraction-networking/water/blob/master/LICENSE)
+![Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-green)
+![GPLv3](https://img.shields.io/badge/License-GPL--3.0-red)
 [![FOSSA](https://app.fossa.com/api/projects/git%2Bgithub.com%2Frefraction-networking%2Fwater.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Frefraction-networking%2Fwater?ref=badge_shield&issueType=license)
 [![CI](https://github.com/refraction-networking/water/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/refraction-networking/water/actions/workflows/go.yml)
 [![Go Doc](https://pkg.go.dev/badge/github.com/refraction-networking/water.svg)](https://pkg.go.dev/github.com/refraction-networking/water)
