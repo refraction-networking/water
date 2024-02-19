@@ -1,10 +1,20 @@
-name: "Go"
+name: "water"
 
 on:
   push:
     branches: [ "master" ]
+    paths-ignore:
+      - 'watm/**'
+      - '**.md'
+      - '**/LICENSE'
+      - '**/LICENSE-*'
   pull_request:
     branches: [ "master" ]
+    paths-ignore:
+      - 'watm/**'
+      - '**.md'
+      - '**/LICENSE'
+      - '**/LICENSE-*'
 
 env:
   CGO_ENABLED: 0
@@ -15,13 +25,13 @@ jobs:
     strategy:
       matrix:
         os: [ "ubuntu", "windows" ] 
-        go: [ "1.21", "1.22" ] # we support the latest 2 stable versions of Go
+        go: [ "1.21.x", "1.22.x" ] # we support the latest 2 stable versions of Go
     runs-on: ${{ matrix.os }}-latest # use latest OS image
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-go@v5
       with:
-        go-version: ${{ matrix.go }}.x # use latest patch version under the minor version
+        go-version: ${{ matrix.go }}
     - run: go version
     - name: Build and Test
       run:  |
@@ -32,7 +42,7 @@ jobs:
     name: go${{ matrix.go }} (linux/${{ matrix.arch }})
     strategy:
       matrix:
-        go: [ "1.21", "1.22" ] # we support the latest 2 stable versions of Go
+        go: [ "1.21.x", "1.22.x" ] # we support the latest 2 stable versions of Go
         arch: [ "arm64", "riscv64" ]
     runs-on: ubuntu-latest
     steps:
@@ -40,7 +50,7 @@ jobs:
     - name: Set up
       uses: actions/setup-go@v5
       with:
-        go-version: ${{ matrix.go }}.x  # use latest patch version under the minor version
+        go-version: ${{ matrix.go }}
     - name: Install QEMU
       uses: docker/setup-qemu-action@v3
     - name: Build and Test
@@ -52,13 +62,13 @@ jobs:
     name: go${{ matrix.go }} (macos/amd64)
     strategy:
       matrix:
-        go: [ "1.21", "1.22" ] # we support the latest 2 stable versions of Go
+        go: [ "1.21.x", "1.22.x" ] # we support the latest 2 stable versions of Go
     runs-on: macos-12
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-go@v5
       with:
-        go-version: ${{ matrix.go }}.x # use latest patch version under the minor version
+        go-version: ${{ matrix.go }}
     - run: go version
     - name: Build and Test
       run:  |
@@ -69,13 +79,13 @@ jobs:
     name: go${{ matrix.go }} (macos/arm64)
     strategy:
       matrix:
-        go: [ "1.21", "1.22" ] # we support the latest 2 stable versions of Go
+        go: [ "1.21.x", "1.22.x" ] # we support the latest 2 stable versions of Go
     runs-on: macos-14
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-go@v5
       with:
-        go-version: ${{ matrix.go }}.x # use latest patch version under the minor version
+        go-version: ${{ matrix.go }}
     - run: go version
     - name: Build and Test
       run:  |
@@ -88,8 +98,8 @@ jobs:
     env:
       CGO_ENABLED: 1 # go: -race requires cgo; enable cgo by setting CGO_ENABLED=1
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-go@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
       with:
         go-version: "1.22.x"
     - run: go version
@@ -100,8 +110,8 @@ jobs:
     name: lint
     runs-on: "ubuntu-latest"
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.22.x"
           cache: false

@@ -1,5 +1,6 @@
 # W.A.T.E.R.: WebAssembly Transport Executables Runtime
-[![License](https://img.shields.io/github/license/gaukas/water)](https://github.com/refraction-networking/water/blob/master/LICENSE)
+![Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-green)
+![GPLv3](https://img.shields.io/badge/License-GPL--3.0-red)
 [![FOSSA](https://app.fossa.com/api/projects/git%2Bgithub.com%2Frefraction-networking%2Fwater.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Frefraction-networking%2Fwater?ref=badge_shield&issueType=license)
 [![CI](https://github.com/refraction-networking/water/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/refraction-networking/water/actions/workflows/go.yml)
 [![Go Doc](https://pkg.go.dev/badge/github.com/refraction-networking/water.svg)](https://pkg.go.dev/github.com/refraction-networking/water)
@@ -19,7 +20,7 @@
     </div>
 </div>
 
-To build a WATM in Go, please refer to [watm](https://github.com/gaukas/watm) for examples and helper libraries interfacing Pluggable Transports-like interfaces. Official Go compiler is currently not supported ([watm#4](https://github.com/gaukas/watm/issues/4)).
+To build a WATM in Go, please refer to [watm](https://github.com/refraction-networking/water/watm) for examples and helper libraries interfacing Pluggable Transports-like interfaces. Official Go compiler is currently not supported until further notice.
 
 You can contact one of developers personally via gaukas.wang@colorado.edu, or simply [opening an issue](https://github.com/refraction-networking/water/issues/new). 
 
@@ -170,6 +171,17 @@ to tunnel traffic.
 ## Example
 
 See [examples](./examples) for example usecase of W.A.T.E.R. API, including `Dialer`, `Listener` and `Relay`.
+
+# License
+
+This project is dual-licensed under both the Apache 2.0 license and the GPLv3 license. The license applies differently depending on how this project is used.
+
+- **Apache 2.0**: **ONLY** when this project is imported/used as-is bearing the name `water`, or being tested with a change that is intended to be contributed back to the `water` project later. 
+- **GPLv3** applies otherwise, which means if you modify, redistribute and rebrand this project in other projects WITHOUT using the name `water` or the change is considered private and not intended to be contributed back to the `water` project, you MUST also open source your modification under the GPLv3 license and forfeit the right to use the Apache 2.0 license.
+
+## Submodules
+
+`watm` has its own licensing policy, please refer to [watm](https://github.com/refraction-networking/water/watm) for more information.
 
 # Cross-platform Support
 

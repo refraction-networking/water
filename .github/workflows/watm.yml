@@ -1,0 +1,60 @@
+name: "watm"
+
+on:
+  push:
+    branches: [ "master" ]
+    paths:
+      - 'watm/**'
+      - '!watm/*/snippets/**' # ignore changes to snippets since they are not part of the module
+      - '!**.md' # ignore changes to markdown files since they are not part of the code
+  pull_request:
+    branches: [ "master" ]
+    paths:
+      - 'watm/**'
+      - '!watm/*/snippets/**' # ignore changes to snippets since they are not part of the module
+      - '!**.md' # ignore changes to markdown files since they are not part of the code
+
+env:
+  CGO_ENABLED: 0
+
+jobs:
+  watm_build_and_test:
+    name: "go${{ matrix.go }} test"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: [ "1.21.x", "1.22.x" ] # we support the latest 2 stable versions of Go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go version
+      - name: Build and Test
+        run:  |
+          go build -v ./...
+          go test -v ./...
+        working-directory: ./watm
+
+  watm_build_tinygo_v0_examples:
+    name: "build ${{ matrix.examples }}.v0.tinygo.wasm w/ tinygo ${{ matrix.tinygo }} (go${{ matrix.go }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        tinygo: [ "0.30.0" ] # latest tinygo version ONLY (1)
+        go: [ "1.20.x", "1.21.x" ] # latest 2 stable versions of Go. TODO: bump to 1.22.x once tinygo support added.
+        examples: [ "plain", "reverse", "utls" ] # Add examples here per ones under tinygo/v0/examples
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go }}
+    - uses: acifani/setup-tinygo@v2
+      with:
+        tinygo-version: ${{ matrix.tinygo }}
+    - name: Build
+      run: |
+        mkdir -p tmp
+        tinygo build -o tmp/${{ matrix.examples }}.wasm -target=wasi -tags=purego ./tinygo/v0/examples/${{ matrix.examples }}/
+      working-directory: ./watm
