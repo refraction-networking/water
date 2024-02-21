@@ -1,6 +1,5 @@
 # W.A.T.E.R.: WebAssembly Transport Executables Runtime
 ![Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-green)
-![GPLv3](https://img.shields.io/badge/License-GPL--3.0-red)
 [![FOSSA](https://app.fossa.com/api/projects/git%2Bgithub.com%2Frefraction-networking%2Fwater.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Frefraction-networking%2Fwater?ref=badge_shield&issueType=license)
 [![CI](https://github.com/refraction-networking/water/actions/workflows/water.yml/badge.svg?branch=master)](https://github.com/refraction-networking/water/actions/workflows/water.yml)
 [![Go Doc](https://pkg.go.dev/badge/github.com/refraction-networking/water.svg)](https://pkg.go.dev/github.com/refraction-networking/water)
@@ -58,12 +57,7 @@ If you quoted or used our work in your own project/paper/research, please cite o
 
 # License
 
-This project is dual-licensed under both the Apache 2.0 license and the GPLv3 license. The license applies differently depending on how this project is used.
-
-- **Apache 2.0**: applies for the project itself, and all of its submodules EXCEPT examples under `watm` module.
-- **GPLv3** applies when your project uses the code from the examples provided by the `watm` module, including but not limited to when you modify and redistribute the example code, or even use it for a non-water scenario. However, if you decide to distribute the examples in a compiled form (i.e., the `.wasm` file), you are free to use the compiled output without a problem.
-
-In short, if you import `water` and `watm` module and build your own WATM out of it, you are free to use the Apache 2.0 license. If you redistribute the code of examples in `watm` module, you are subject to the GPLv3 license.
+This project is licensed under Apache 2.0 license. 
 
 ## Contents
 
@@ -183,7 +177,7 @@ See [examples](./examples) for example usecase of W.A.T.E.R. API, including `Dia
 
 ## Submodules
 
-`watm` has its own licensing policy, please refer to [watm](https://github.com/refraction-networking/water/watm) for more information.
+`watm` has its own licensing policy, please refer to [watm](https://github.com/refraction-networking/watm) for more information.
 
 # Cross-platform Support
 

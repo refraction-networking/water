@@ -4,17 +4,13 @@ on:
   push:
     branches: [ "master" ]
     paths-ignore:
-      - 'watm/**'
       - '**.md'
-      - '**/LICENSE'
-      - '**/LICENSE-*'
+      - '**/LICENSE*'
   pull_request:
     branches: [ "master" ]
     paths-ignore:
-      - 'watm/**'
       - '**.md'
-      - '**/LICENSE'
-      - '**/LICENSE-*'
+      - '**/LICENSE*'
 
 env:
   CGO_ENABLED: 0
