@@ -11,7 +11,7 @@
         application-layer transport protocol provider. It is designed to be highly portable and
         lightweight, allowing for rapidly deployable pluggable transports. While other pluggable
         transport implementations require a fresh client deployment (and app-store review) to update
-        their protocol WATER allows <b><u>dynamic delivery of new transports</u></b> in real time
+        their protocol WATER allows <b>dynamic delivery of new transports</b> in real time
         over the network or out-of-band.<br />
         <br />
     </div>
@@ -55,6 +55,15 @@ If you quoted or used our work in your own project/paper/research, please cite o
 > Empty your mind, be formless, shapeless, like water. If you put water into a cup, it becomes the cup. You put water into a bottle and it becomes the bottle. You put it in a teapot, it becomes the teapot. Now, water can flow or it can crash. Be water, my friend.
 >
 > -- Bruce Lee
+
+# License
+
+This project is dual-licensed under both the Apache 2.0 license and the GPLv3 license. The license applies differently depending on how this project is used.
+
+- **Apache 2.0**: applies for the project itself, and all of its submodules EXCEPT examples under `watm` module.
+- **GPLv3** applies when your project uses the code from the examples provided by the `watm` module, including but not limited to when you modify and redistribute the example code, or even use it for a non-water scenario. However, if you decide to distribute the examples in a compiled form (i.e., the `.wasm` file), you are free to use the compiled output without a problem.
+
+In short, if you import `water` and `watm` module and build your own WATM out of it, you are free to use the Apache 2.0 license. If you redistribute the code of examples in `watm` module, you are subject to the GPLv3 license.
 
 ## Contents
 
@@ -171,13 +180,6 @@ to tunnel traffic.
 ## Example
 
 See [examples](./examples) for example usecase of W.A.T.E.R. API, including `Dialer`, `Listener` and `Relay`.
-
-# License
-
-This project is dual-licensed under both the Apache 2.0 license and the GPLv3 license. The license applies differently depending on how this project is used.
-
-- **Apache 2.0**: **ONLY** when this project is imported/used as-is bearing the name `water`, or being tested with a change that is intended to be contributed back to the `water` project later. 
-- **GPLv3** applies otherwise, which means if you modify, redistribute and rebrand this project in other projects WITHOUT using the name `water` or the change is considered private and not intended to be contributed back to the `water` project, you MUST also open source your modification under the GPLv3 license and forfeit the right to use the Apache 2.0 license.
 
 ## Submodules
 
