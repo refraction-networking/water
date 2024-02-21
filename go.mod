@@ -3,7 +3,8 @@ module github.com/refraction-networking/water
 go 1.20
 
 retract (
-    v0.6.0 // bad LICENSE naming
+	v0.6.0 // bad LICENSE naming
+	v0.6.1 // bad submodule
 )
 
 replace github.com/tetratelabs/wazero v1.6.0 => github.com/refraction-networking/wazero v1.6.6-w
