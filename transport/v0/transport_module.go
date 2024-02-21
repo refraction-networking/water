@@ -692,7 +692,7 @@ func (tm *TransportModule) pushConfig() int32 {
 	}
 
 	configFile, err := tm.Core().Config().TransportModuleConfig.AsFile()
-	if err == nil {
+	if err != nil {
 		log.LErrorf(tm.Core().Logger(), "water: getting config file failed: %v", err)
 		return wasip1.EncodeWATERError(syscall.EBADF) // Cannot read a provided config file
 	}
