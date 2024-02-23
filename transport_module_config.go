@@ -72,6 +72,15 @@ func (c transportModuleConfigBytes) AsFile() (*os.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp file for transport module config: %w", err)
 	}
+
+	if _, err := f.Write(c); err != nil {
+		return nil, fmt.Errorf("failed to write transport module config to temp file: %w", err)
+	}
+	// reset the file pointer to the beginning of the file
+	if _, err := f.Seek(0, 0); err != nil {
+		return nil, fmt.Errorf("failed to seek to the beginning of the temp file: %w", err)
+	}
+
 	runtime.SetFinalizer(f, func(tmpFile *os.File) {
 		tmpFile.Close()
 		// Remove the temp file from local file system when collected.
@@ -81,10 +90,6 @@ func (c transportModuleConfigBytes) AsFile() (*os.File, error) {
 		// it is still better than nothing when concurrency is high.
 		os.Remove(tmpFile.Name())
 	})
-
-	if _, err := f.Write(c); err != nil {
-		return nil, fmt.Errorf("failed to write transport module config to temp file: %w", err)
-	}
 
 	return f, nil
 }
