@@ -33,19 +33,14 @@ If you quoted or used our work in your own project/paper/research, please cite o
   <summary>BibTeX</summary>
     
   ```bibtex
-    @inproceedings{water-foci24,
-        author = {Chi, Erik and Wang, Gaukas and Halderman, J. Alex and Wustrow, Eric and Wampler, Jack},
-        year = {2024},
-        month = {02},
-        number = {1},
-        pages = {22-28},
-        title = {Just add {WATER}: {WebAssembly}-based Circumvention Transports},
-        howpublished = "\url{https://www.petsymposium.org/foci/2024/foci-2024-0003.php}",
-        publisher = {PoPETs},
-        address = {Virtual Event},
-        series = {FOCI '24},
-        booktitle = {Free and Open Communications on the Internet},
-    }
+  @inproceedings{water-foci24,
+      author = {Erik Chi and Gaukas Wang and J. Alex Halderman and Eric Wustrow and Jack Wampler},
+      title = {Just add {WATER}: {WebAssembly}-based Circumvention Transports},
+      booktitle = {Free and Open Communications on the Internet},
+      publisher = {},
+      year = {2024},
+      url = {https://www.petsymposium.org/foci/2024/foci-2024-0003.pdf},
+  }
   ```
 </details>
 
