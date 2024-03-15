@@ -167,13 +167,17 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	tmBin, err := os.ReadFile(confJson.TransportModule.BinPath)
-	if err != nil {
-		return err
+	// Load TMBin if not already set
+	if c.TransportModuleBin == nil {
+		tmBin, err := os.ReadFile(confJson.TransportModule.BinPath)
+		if err != nil {
+			return err
+		}
+		c.TransportModuleBin = tmBin
 	}
-	c.TransportModuleBin = tmBin
 
-	if len(confJson.TransportModule.ConfigPath) > 0 {
+	// Load TMConfig if not already set
+	if c.TransportModuleConfig == nil && len(confJson.TransportModule.ConfigPath) > 0 {
 		c.TransportModuleConfig, err = TransportModuleConfigFromFile(confJson.TransportModule.ConfigPath)
 		if err != nil {
 			return err
@@ -244,14 +248,18 @@ func (c *Config) UnmarshalProto(b []byte) error {
 		return err
 	}
 
-	// Parse TransportModuleBin
-	c.TransportModuleBin = confProto.GetTransportModule().GetBin()
-	if len(c.TransportModuleBin) == 0 {
-		return errors.New("water: transport module binary is not provided in config")
+	// Parse TransportModuleBin if not already set
+	if c.TransportModuleBin == nil {
+		c.TransportModuleBin = confProto.GetTransportModule().GetBin()
+		if len(c.TransportModuleBin) == 0 {
+			return errors.New("water: transport module binary is not provided in config")
+		}
 	}
 
-	// Parse TransportModuleConfig
-	c.TransportModuleConfig = TransportModuleConfigFromBytes(confProto.GetTransportModule().GetConfig())
+	// Parse TransportModuleConfig if not already set
+	if c.TransportModuleConfig == nil {
+		c.TransportModuleConfig = TransportModuleConfigFromBytes(confProto.GetTransportModule().GetConfig())
+	}
 
 	// Parse NetworkListener
 	listenerNetwork, listenerAddress := confProto.GetNetwork().GetListener().GetNetwork(), confProto.GetNetwork().GetListener().GetAddress()
