@@ -51,7 +51,7 @@ func ExampleListener() {
 		panic(err)
 	}
 	if n != len(msg) {
-		panic(err)
+		panic("short write")
 	}
 
 	buf := make([]byte, 1024)
@@ -60,7 +60,7 @@ func ExampleListener() {
 		panic(err)
 	}
 	if n != len(msg) {
-		panic(err)
+		panic("short read")
 	}
 
 	fmt.Println(string(buf[:n]))
