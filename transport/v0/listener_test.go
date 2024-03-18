@@ -85,7 +85,8 @@ func TestListener(t *testing.T) {
 func testListenerBadAddr(t *testing.T) {
 	// prepare
 	config := &water.Config{
-		TransportModuleBin: wasmPlain,
+		TransportModuleBin:  wasmPlain,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 
 	_, err := config.ListenContext(context.Background(), "tcp", "256.267.278.289:2023")
@@ -97,7 +98,8 @@ func testListenerBadAddr(t *testing.T) {
 func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 	// prepare
 	config := &water.Config{
-		TransportModuleBin: wasmPlain,
+		TransportModuleBin:  wasmPlain,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 
 	testLis, err := config.ListenContext(context.Background(), "tcp", "localhost:0")
@@ -219,7 +221,8 @@ func testListenerPlain(t *testing.T) { // skipcq: GO-R1005
 func testListenerReverse(t *testing.T) { // skipcq: GO-R1005
 	// prepare
 	config := &water.Config{
-		TransportModuleBin: wasmReverse,
+		TransportModuleBin:  wasmReverse,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 
 	testLis, err := config.ListenContext(context.Background(), "tcp", "localhost:0")
@@ -359,7 +362,8 @@ func testListenerPartialWATM(t *testing.T) {
 func BenchmarkInboundListener(b *testing.B) {
 	// prepare
 	config := &water.Config{
-		TransportModuleBin: wasmPlain,
+		TransportModuleBin:  wasmPlain,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 
 	testLis, err := config.ListenContext(context.Background(), "tcp", "localhost:0")
@@ -407,7 +411,8 @@ func BenchmarkInboundListener(b *testing.B) {
 func BenchmarkInboundListenerReverse(b *testing.B) {
 	// prepare
 	config := &water.Config{
-		TransportModuleBin: wasmReverse,
+		TransportModuleBin:  wasmReverse,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 
 	testLis, err := config.ListenContext(context.Background(), "tcp", "localhost:0")
