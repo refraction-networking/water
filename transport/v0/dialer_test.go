@@ -50,7 +50,7 @@ func ExampleDialer() {
 		panic(err)
 	}
 	if n != len(msg) {
-		panic(err)
+		panic("short write")
 	}
 
 	buf := make([]byte, 1024)
@@ -59,7 +59,7 @@ func ExampleDialer() {
 		panic(err)
 	}
 	if n != len(msg) {
-		panic(err)
+		panic("short read")
 	}
 
 	fmt.Println(string(buf[:n]))
@@ -84,7 +84,8 @@ func TestDialer(t *testing.T) {
 func testDialerBadAddr(t *testing.T) {
 	// Dial
 	config := &water.Config{
-		TransportModuleBin: wasmPlain,
+		TransportModuleBin:  wasmPlain,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 
 	dialer, err := v0.NewDialerWithContext(context.Background(), config)
@@ -107,7 +108,8 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 
 	// Dial using water
 	config := &water.Config{
-		TransportModuleBin: wasmPlain,
+		TransportModuleBin:  wasmPlain,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 	dialer, err := v0.NewDialerWithContext(context.Background(), config)
 	if err != nil {
@@ -232,7 +234,8 @@ func testDialerReverse(t *testing.T) { // skipcq: GO-R1005
 
 	// Dial using water
 	config := &water.Config{
-		TransportModuleBin: wasmReverse,
+		TransportModuleBin:  wasmReverse,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 	dialer, err := v0.NewDialerWithContext(context.Background(), config)
 	if err != nil {
@@ -376,7 +379,8 @@ func BenchmarkDialerOutbound(b *testing.B) {
 
 	// Dial
 	config := &water.Config{
-		TransportModuleBin: wasmPlain,
+		TransportModuleBin:  wasmPlain,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 	dialer, err := v0.NewDialerWithContext(context.Background(), config)
 	if err != nil {
@@ -432,7 +436,8 @@ func BenchmarkDialerOutboundReverse(b *testing.B) {
 
 	// Dial
 	config := &water.Config{
-		TransportModuleBin: wasmReverse,
+		TransportModuleBin:  wasmReverse,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
 	}
 	dialer, err := v0.NewDialerWithContext(context.Background(), config)
 	if err != nil {

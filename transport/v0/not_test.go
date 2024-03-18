@@ -21,6 +21,15 @@ var (
 	wasmReverse []byte
 )
 
+//// Gaukas: uncomment the following code once we decide to require
+//// go1.21 as minimum version
+// func init() {
+// 	var programLevel = new(slog.LevelVar) // Info by default
+// 	h := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: programLevel})
+// 	slog.SetDefault(slog.New(h))
+// 	programLevel.Set(slog.LevelError)
+// }
+
 func benchmarkUnidirectionalStream(b *testing.B, wrConn, rdConn net.Conn) {
 	var sendMsg []byte = make([]byte, 1024)
 	_, err := rand.Read(sendMsg)
