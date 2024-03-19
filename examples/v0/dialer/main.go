@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/refraction-networking/water"
@@ -83,8 +84,10 @@ func worker() {
 	}()
 
 	// start a ticker for sending message every 5 seconds
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
+
+	var memStats runtime.MemStats
 
 	var sendBuf []byte = make([]byte, 4) // 4 bytes per message
 	for {
@@ -108,6 +111,10 @@ func worker() {
 				log.Warnf("write: error %v, tearing down connection...", err)
 				return
 			}
+			runtime.ReadMemStats(&memStats)
+
+			log.Infof("Alloc: %dMB, TotalAlloc: %dMB, Sys: %dMB, NumGC: %d\n",
+				memStats.Alloc/1024/1024, memStats.TotalAlloc/1024/1024, memStats.Sys/1024/1024, memStats.NumGC)
 		}
 	}
 }
