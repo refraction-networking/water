@@ -44,10 +44,17 @@ type Config struct {
 	// and/or debugging purposes only.
 	//
 	// Caller is supposed to call c.ModuleConfig() to get the pointer to the
-	// ModuleConfigFactory. If the pointer is nil, a new ModuleConfigFactory will
+	// ModuleConfigFactory. If this field is unset, a new ModuleConfigFactory will
 	// be created and returned.
 	ModuleConfigFactory *WazeroModuleConfigFactory
 
+	// RuntimeConfigFactory is used to configure the runtime behavior of
+	// each WASM instance created. This field is for advanced use cases
+	// and/or debugging purposes only.
+	//
+	// Caller is supposed to call c.RuntimeConfig() to get the pointer to the
+	// RuntimeConfigFactory. If this field is unset, a new RuntimeConfigFactory will
+	// be created and returned.
 	RuntimeConfigFactory *WazeroRuntimeConfigFactory
 
 	// OverrideLogger is a slog.Logger, used by WATER to log messages including
