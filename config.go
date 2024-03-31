@@ -50,7 +50,11 @@ type Config struct {
 
 	RuntimeConfigFactory *WazeroRuntimeConfigFactory
 
-	OverrideLogger *log.Logger // essentially a *slog.Logger, currently using an alias to flatten the version discrepancy
+	// OverrideLogger is a slog.Logger, used by WATER to log messages including
+	// debugging information, warnings, errors that cannot be returned to the caller
+	// of the WATER API. If this field is unset, the default logger from the slog
+	// package will be used.
+	OverrideLogger *log.Logger
 }
 
 // Clone creates a deep copy of the Config.
