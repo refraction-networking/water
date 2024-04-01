@@ -38,7 +38,7 @@ func testConfigCloneValid(t *testing.T) {
 			f.Set(reflect.ValueOf(make([]byte, 256)))
 		case "TransportModuleConfig":
 			f.Set(reflect.ValueOf(water.TransportModuleConfigFromBytes([]byte("foo"))))
-		case "NetworkDialerFunc": // functions aren't deeply equal unless nil
+		case "NetworkDialerFunc", "DialedAddressValidator": // functions aren't deeply equal unless nil
 			continue
 		case "NetworkListener":
 			f.Set(reflect.ValueOf(&net.TCPListener{}))

@@ -31,6 +31,11 @@ type Config struct {
 	// 	net.Dial(network, address)
 	NetworkDialerFunc func(network, address string) (net.Conn, error)
 
+	// DialedAddressValidator is an optional field that can be set to validate
+	// the dialed address. It is only used when WATM specifies the remote
+	// address to dial.
+	DialedAddressValidator func(network, address string) error
+
 	// NetworkListener specifies a net.listener implementation that listens
 	// on the specified address on the named network. This optional field
 	// will be used to provide (incoming) network connections from a
@@ -74,13 +79,14 @@ func (c *Config) Clone() *Config {
 	copy(wasmClone, c.TransportModuleBin)
 
 	return &Config{
-		TransportModuleBin:    wasmClone,
-		TransportModuleConfig: c.TransportModuleConfig,
-		NetworkDialerFunc:     c.NetworkDialerFunc,
-		NetworkListener:       c.NetworkListener,
-		ModuleConfigFactory:   c.ModuleConfigFactory.Clone(),
-		RuntimeConfigFactory:  c.RuntimeConfigFactory.Clone(),
-		OverrideLogger:        c.OverrideLogger,
+		TransportModuleBin:     wasmClone,
+		TransportModuleConfig:  c.TransportModuleConfig,
+		NetworkDialerFunc:      c.NetworkDialerFunc,
+		DialedAddressValidator: c.DialedAddressValidator,
+		NetworkListener:        c.NetworkListener,
+		ModuleConfigFactory:    c.ModuleConfigFactory.Clone(),
+		RuntimeConfigFactory:   c.RuntimeConfigFactory.Clone(),
+		OverrideLogger:         c.OverrideLogger,
 	}
 }
 
