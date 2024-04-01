@@ -18,7 +18,13 @@ type TransportModuleConfig interface {
 	//
 	// If the returned error is nil, the *os.File MUST be valid
 	// and in a readable state.
+	//
+	// It is recommended to use AsBytes instead, which does not
+	// leave any temporary files on the local file system.
 	AsFile() (*os.File, error)
+
+	// AsBytes returns the TransportModuleConfig as a byte slice.
+	AsBytes() []byte
 }
 
 // transportModuleConfigFile could be used to provide a config file
@@ -52,6 +58,20 @@ func (c transportModuleConfigFile) AsFile() (*os.File, error) {
 	}
 
 	return f, nil
+}
+
+// AsBytes implements TransportModuleConfig.
+func (c transportModuleConfigFile) AsBytes() []byte {
+	if string(c) == "" {
+		return nil
+	}
+
+	buf, err := os.ReadFile(string(c))
+	if err != nil {
+		return nil
+	}
+
+	return buf
 }
 
 type transportModuleConfigBytes []byte
@@ -92,4 +112,9 @@ func (c transportModuleConfigBytes) AsFile() (*os.File, error) {
 	})
 
 	return f, nil
+}
+
+// AsBytes implements TransportModuleConfig.
+func (c transportModuleConfigBytes) AsBytes() []byte {
+	return c
 }

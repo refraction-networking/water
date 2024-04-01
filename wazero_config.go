@@ -45,6 +45,20 @@ func (wmcf *WazeroModuleConfigFactory) GetConfig() wazero.ModuleConfig {
 	return wmcf.moduleConfig.WithFSConfig(wmcf.fsconfig)
 }
 
+// GetFSConfig returns the latest wazero.FSConfig.
+func (wmcf *WazeroModuleConfigFactory) GetFSConfig() wazero.FSConfig {
+	if wmcf == nil {
+		panic("water: GetFSConfig: wmcf is nil")
+	}
+
+	return wmcf.fsconfig
+}
+
+// SetFSConfig sets the wazero.FSConfig for the WebAssembly module.
+func (wmcf *WazeroModuleConfigFactory) SetFSConfig(fsconfig wazero.FSConfig) {
+	wmcf.fsconfig = fsconfig
+}
+
 // SetArgv sets the arguments for the WebAssembly module.
 //
 // Warning: this isn't a recommended way to pass configuration to the
