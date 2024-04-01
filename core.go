@@ -33,6 +33,9 @@ type Core interface {
 	// Context returns the base context used by the Core.
 	Context() context.Context
 
+	// ContextCancel cancels the base context used by the Core.
+	ContextCancel()
+
 	// Close closes the Core and releases all the resources
 	// associated with it.
 	Close() error
@@ -139,10 +142,11 @@ type core struct {
 	// config
 	config *Config
 
-	ctx      context.Context
-	runtime  wazero.Runtime
-	module   wazero.CompiledModule
-	instance api.Module
+	ctx       context.Context
+	ctxCancel context.CancelFunc
+	runtime   wazero.Runtime
+	module    wazero.CompiledModule
+	instance  api.Module
 
 	// saved after Exports() is called
 	exportsLoadOnce sync.Once
@@ -186,7 +190,7 @@ func NewCoreWithContext(ctx context.Context, config *Config) (Core, error) {
 		importModules: make(map[string]wazero.HostModuleBuilder),
 	}
 
-	c.ctx = ctx
+	c.ctx, c.ctxCancel = context.WithCancel(ctx)
 	c.runtime = wazero.NewRuntimeWithConfig(ctx, config.RuntimeConfig().GetConfig())
 
 	if c.module, err = c.runtime.CompileModule(ctx, c.config.WATMBinOrPanic()); err != nil {
@@ -208,6 +212,11 @@ func (c *core) Config() *Config {
 // Context implements Core.
 func (c *core) Context() context.Context {
 	return c.ctx
+}
+
+// ContextCancel implements Core.
+func (c *core) ContextCancel() {
+	c.ctxCancel()
 }
 
 func (c *core) cleanup() {
@@ -254,6 +263,17 @@ func (c *core) Close() error {
 			}
 			c.module = nil // TODO: force dropped
 			log.LDebugf(c.config.Logger(), "MODULE DROPPED")
+		}
+
+		if c.ctxCancel != nil {
+			c.ctxCancel()
+			c.ctxCancel = nil
+			log.LDebugf(c.config.Logger(), "CONTEXT CANCELED")
+		}
+
+		if c.ctx != nil {
+			c.ctx = nil // TODO: force dropped
+			log.LDebugf(c.config.Logger(), "CONTEXT DROPPED")
 		}
 
 		c.cleanup()
