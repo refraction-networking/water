@@ -34,6 +34,9 @@ type Config struct {
 	// DialedAddressValidator is an optional field that can be set to validate
 	// the dialed address. It is only used when WATM specifies the remote
 	// address to dial.
+	//
+	// If not set, all addresses are considered invalid. To allow all addresses,
+	// simply set this field to a function that always returns nil.
 	DialedAddressValidator func(network, address string) error
 
 	// NetworkListener specifies a net.listener implementation that listens

@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/refraction-networking/water"
-	_ "github.com/refraction-networking/water/transport/v0"
+	_ "github.com/refraction-networking/water/transport/v1"
 )
 
 // ExampleListener demonstrates how to use water.Listener.
@@ -58,6 +58,10 @@ func ExampleListener() {
 	}
 	if n != len(msg) {
 		panic("short read")
+	}
+
+	if err := waterConn.Close(); err != nil {
+		panic(err)
 	}
 
 	fmt.Println(string(buf[:n]))

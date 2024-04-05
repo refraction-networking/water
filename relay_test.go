@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/refraction-networking/water"
-	_ "github.com/refraction-networking/water/transport/v0"
+	_ "github.com/refraction-networking/water/transport/v1"
 )
 
 // ExampleRelay demonstrates how to use water.Relay.
@@ -76,6 +76,10 @@ func ExampleRelay() {
 	}
 	if n != len(msg) {
 		panic("short read")
+	}
+
+	if err := waterRelay.Close(); err != nil {
+		panic(err)
 	}
 
 	fmt.Println(string(buf[:n]))

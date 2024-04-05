@@ -5,9 +5,9 @@ import (
 )
 
 var (
-	//go:embed transport/v0/testdata/plain.wasm
+	//go:embed transport/v1/testdata/plain.wasm
 	wasmPlain []byte //nolint:unused
 
-	//go:embed transport/v0/testdata/reverse.wasm
+	//go:embed transport/v1/testdata/reverse.wasm
 	wasmReverse []byte
 )

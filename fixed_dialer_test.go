@@ -18,25 +18,32 @@ import (
 // It is worth noting that unless the W.A.T.E.R. API changes, the version upgrade
 // does not bring any essential changes to this example other than the import
 // path and wasm file path.
-func ExampleDialer() {
+// ExampleFixedDialer demonstrates how to use v1.FixedDialer as a water.Dialer.
+func ExampleFixedDialer() {
 	config := &water.Config{
 		TransportModuleBin:  wasmReverse,
 		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
+		DialedAddressValidator: func(network, address string) error {
+			if network != "tcp" || address != "localhost:7700" {
+				return fmt.Errorf("invalid address: %s", address)
+			}
+			return nil
+		},
 	}
 
-	waterDialer, err := water.NewDialer(config)
+	waterDialer, err := water.NewFixedDialerWithContext(context.Background(), config)
 	if err != nil {
 		panic(err)
 	}
 
 	// create a local TCP listener
-	tcpListener, err := net.Listen("tcp", "localhost:0")
+	tcpListener, err := net.Listen("tcp", "localhost:7700")
 	if err != nil {
 		panic(err)
 	}
 	defer tcpListener.Close() // skipcq: GO-S2307
 
-	waterConn, err := waterDialer.DialContext(context.Background(), "tcp", tcpListener.Addr().String())
+	waterConn, err := waterDialer.DialFixedContext(context.Background())
 	if err != nil {
 		panic(err)
 	}
@@ -73,7 +80,3 @@ func ExampleDialer() {
 	fmt.Println(string(buf[:n]))
 	// Output: olleh
 }
-
-// It is possible to supply further tests with better granularity,
-// but it is not necessary for now since these tests will be duplicated
-// in where they are actually implemented (e.g. transport/v0).

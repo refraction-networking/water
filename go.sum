@@ -1,4 +1,9 @@
+github.com/blang/vfs v1.0.0 h1:AUZUgulCDzbaNjTRWEP45X7m/J10brAptZpSRKRZBZc=
+github.com/blang/vfs v1.0.0/go.mod h1:jjuNUc/IKcRNNWC9NUCvz4fR9PZLPIKxEygtPs/4tSI=
 github.com/google/go-cmp v0.5.8 h1:e6P7q2lk1O+qJJb4BtCQXlK8vWEO8V1ZeuEdJNOqZyg=
+github.com/google/go-cmp v0.5.8/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
+github.com/karelbilek/wazero-fs-tools v0.0.0-20240317201741-fc5622f5bd12 h1:2BGAdZ5gPGtRgLawYeDR2XTjWoi38kNYVF8vzrESQDw=
+github.com/karelbilek/wazero-fs-tools v0.0.0-20240317201741-fc5622f5bd12/go.mod h1:Ed3NLyTuuJ7rNUITSo+wEvMbRLwYjslaE5w8q/UWoEA=
 github.com/refraction-networking/wazero v1.7.0-w h1:fFQO1VL+fhpFWIgfZN9FPnWYhf5DTyzwzJijqg/LUm4=
 github.com/refraction-networking/wazero v1.7.0-w/go.mod h1:ytl6Zuh20R/eROuyDaGPkp82O9C/DJfXAwJfQ3X6/7Y=
 golang.org/x/exp v0.0.0-20240119083558-1b970713d09a h1:Q8/wZp0KX97QFTc2ywcOE0YRjZPVIx+MXInMzdvQqcA=
