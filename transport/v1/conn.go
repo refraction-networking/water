@@ -1,4 +1,4 @@
-package v0
+package v1
 
 import (
 	"errors"
@@ -16,20 +16,20 @@ import (
 
 // Conn is the first experimental version of Conn implementation.
 type Conn struct {
-	// callerConn is used by DialV0() and AcceptV0(). It is used to talk to
-	// the caller of water API by allowing the caller to Read() and Write() to it.
-	callerConn net.Conn // the connection from the caller, usually a *net.TCPConnPair
+	// callerConn is used by Dialer and Listener modes.
+	// It is a connection between WATM and the caller of this library.
+	callerConn net.Conn // currently, only net.TCPConn is supported. TODO: support more connection types
 
-	// srcConn is used by AcceptV0() and RelayV0(). It is used
-	// to talk to a remote source by accepting a connection from it.
-	srcConn net.Conn // the connection from the remote source, usually a *net.TCPConn
+	// srcConn is used by Listener and Relay modes.
+	// It is a connection from the remote dialing source to WATM.
+	srcConn net.Conn // currently, only net.TCPConn is supported. TODO: support more connection types
 
-	// dstConn is used by DialV0() and RelayV0(). It is used
-	// to talk to a remote destination by actively dialing to it.
-	dstConn net.Conn // the connection to the remote destination, usually a *net.TCPConn
+	// dstConn is used by Dialer and Relay modes.
+	// It is a connection from WATM to the remote destination.
+	dstConn net.Conn // currently, only net.TCPConn is supported. TODO: support more connection types
 
-	tm      *TransportModule
-	tmMutex sync.Mutex
+	tm      *TransportModule // abstracted WebAssembly Transport Module (WATM)
+	tmMutex sync.Mutex       // mutex to protect access to tm
 
 	closeOnce sync.Once
 	closed    atomic.Bool
@@ -37,15 +37,71 @@ type Conn struct {
 	water.UnimplementedConn // embedded to ensure forward compatibility
 }
 
-// dial dials the network address using through the WASM module
-// while using the dialerFunc specified in core.config.
+// dialFixed connects to a network address specified bv the WATM.
+func dialFixed(core water.Core) (c water.Conn, err error) {
+	tm := UpgradeCore(core)
+	conn := &Conn{
+		tm: tm,
+	}
+
+	dialer := &networkDialer{
+		dialerFunc:       core.Config().NetworkDialerFuncOrDefault(),
+		addressValidator: core.Config().DialedAddressValidator,
+	}
+
+	if err = conn.tm.LinkNetworkInterface(dialer, nil); err != nil {
+		return nil, err
+	}
+
+	if err = conn.tm.Initialize(); err != nil {
+		return nil, err
+	}
+
+	reverseCallerConn, callerConn, err := socket.TCPConnPair()
+	// wasmCallerConn, conn.uoConn, err = socket.TCPConnPair()
+	if err != nil {
+		if reverseCallerConn == nil || callerConn == nil {
+			return nil, fmt.Errorf("water: socket.TCPConnPair returned error: %w", err)
+		} else { // likely due to Close() call errored
+			log.LErrorf(core.Logger(), "water: socket.TCPConnPair returned error: %v", err)
+		}
+	}
+	conn.callerConn = callerConn
+
+	conn.dstConn, err = conn.tm.DialFixedFrom(reverseCallerConn)
+	if err != nil {
+		return nil, err
+	}
+
+	// safety: we need to watch for the blocking worker thread's status.
+	// If it returns, no further data can be processed by the WASM module
+	// and we need to close this connection in that case.
+	go conn.closeOnWorkerError()
+
+	if err := conn.tm.StartWorker(); err != nil {
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+// dial dials the network address specified using the WATM.
 func dial(core water.Core, network, address string) (c water.Conn, err error) {
 	tm := UpgradeCore(core)
 	conn := &Conn{
 		tm: tm,
 	}
 
-	dialer := NewManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
+	dialer := &networkDialer{
+		dialerFunc: core.Config().NetworkDialerFuncOrDefault(),
+		overrideAddress: struct {
+			network string
+			address string
+		}{
+			network: network,
+			address: address,
+		},
+	}
 
 	if err = conn.tm.LinkNetworkInterface(dialer, nil); err != nil {
 		return nil, err
@@ -76,7 +132,7 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 	// and we need to close this connection in that case.
 	go conn.closeOnWorkerError()
 
-	if err := conn.tm.Worker(); err != nil {
+	if err := conn.tm.StartWorker(); err != nil {
 		return nil, err
 	}
 
@@ -122,7 +178,7 @@ func accept(core water.Core) (c water.Conn, err error) {
 	// and we need to close this connection in that case.
 	go conn.closeOnWorkerError()
 
-	if err := conn.tm.Worker(); err != nil {
+	if err := conn.tm.StartWorker(); err != nil {
 		return nil, err
 	}
 
@@ -135,7 +191,16 @@ func relay(core water.Core, network, address string) (c water.Conn, err error) {
 		tm: tm,
 	}
 
-	dialer := NewManagedDialer(network, address, core.Config().NetworkDialerFuncOrDefault())
+	dialer := &networkDialer{
+		dialerFunc: core.Config().NetworkDialerFuncOrDefault(),
+		overrideAddress: struct {
+			network string
+			address string
+		}{
+			network: network,
+			address: address,
+		},
+	}
 
 	if err = conn.tm.LinkNetworkInterface(dialer, core.Config().NetworkListenerOrPanic()); err != nil {
 		return nil, err
@@ -154,7 +219,7 @@ func relay(core water.Core, network, address string) (c water.Conn, err error) {
 	// and we need to close this connection in that case.
 	go conn.closeOnWorkerError()
 
-	if err := conn.tm.Worker(); err != nil {
+	if err := conn.tm.StartWorker(); err != nil {
 		return nil, err
 	}
 
@@ -172,9 +237,12 @@ func (c *Conn) closeOnWorkerError() {
 	}
 	c.tmMutex.Unlock()
 
-	<-tm.WorkerErrored()
-	log.LDebugf(core.Logger(), "water: WATMv0: worker thread returned")
-	c.Close()
+	if err := tm.WaitWorker(); err != nil { // block until worker thread returns
+		log.LErrorf(core.Logger(), "water: WATMv1: worker thread returned with error: %v", err)
+		c.Close()
+	} else {
+		log.LDebugf(core.Logger(), "water: WATMv1: worker thread returned")
+	}
 }
 
 // Read implements the net.Conn interface.

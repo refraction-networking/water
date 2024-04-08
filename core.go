@@ -2,7 +2,10 @@ package water
 
 import (
 	"context"
+	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"runtime"
@@ -11,7 +14,11 @@ import (
 	"github.com/refraction-networking/water/internal/log"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+
+	"github.com/karelbilek/wazero-fs-tools/memfs"
+	expsysfs "github.com/tetratelabs/wazero/experimental/sysfs"
 )
 
 var (
@@ -32,6 +39,9 @@ type Core interface {
 
 	// Context returns the base context used by the Core.
 	Context() context.Context
+
+	// ContextCancel cancels the base context used by the Core.
+	ContextCancel()
 
 	// Close closes the Core and releases all the resources
 	// associated with it.
@@ -107,6 +117,9 @@ type Core interface {
 	// If the target function is not exported, this function returns an error.
 	Invoke(funcName string, params ...uint64) (results []uint64, err error)
 
+	// ReadIovs reads data from the memory pointed by iovs and writes it to buf.
+	ReadIovs(iovs, iovsLen int32, buf []byte) (int, error)
+
 	// WASIPreview1 enables the WASI preview1 API.
 	//
 	// It is recommended that this function only to be invoked if
@@ -139,10 +152,11 @@ type core struct {
 	// config
 	config *Config
 
-	ctx      context.Context
-	runtime  wazero.Runtime
-	module   wazero.CompiledModule
-	instance api.Module
+	ctx       context.Context
+	ctxCancel context.CancelFunc
+	runtime   wazero.Runtime
+	module    wazero.CompiledModule
+	instance  api.Module
 
 	// saved after Exports() is called
 	exportsLoadOnce sync.Once
@@ -186,7 +200,7 @@ func NewCoreWithContext(ctx context.Context, config *Config) (Core, error) {
 		importModules: make(map[string]wazero.HostModuleBuilder),
 	}
 
-	c.ctx = ctx
+	c.ctx, c.ctxCancel = context.WithCancel(ctx)
 	c.runtime = wazero.NewRuntimeWithConfig(ctx, config.RuntimeConfig().GetConfig())
 
 	if c.module, err = c.runtime.CompileModule(ctx, c.config.WATMBinOrPanic()); err != nil {
@@ -208,6 +222,11 @@ func (c *core) Config() *Config {
 // Context implements Core.
 func (c *core) Context() context.Context {
 	return c.ctx
+}
+
+// ContextCancel implements Core.
+func (c *core) ContextCancel() {
+	c.ctxCancel()
 }
 
 func (c *core) cleanup() {
@@ -254,6 +273,17 @@ func (c *core) Close() error {
 			}
 			c.module = nil // TODO: force dropped
 			log.LDebugf(c.config.Logger(), "MODULE DROPPED")
+		}
+
+		if c.ctxCancel != nil {
+			c.ctxCancel()
+			c.ctxCancel = nil
+			log.LDebugf(c.config.Logger(), "CONTEXT CANCELED")
+		}
+
+		if c.ctx != nil {
+			c.ctx = nil // TODO: force dropped
+			log.LDebugf(c.config.Logger(), "CONTEXT DROPPED")
 		}
 
 		c.cleanup()
@@ -311,10 +341,10 @@ func (c *core) ImportFunction(module, name string, f any) error {
 	// Unsafe: check if the WebAssembly module really imports this function under
 	// the given module and name. If not, we warn and skip the import.
 	if mod, ok := c.ImportedFunctions()[module]; !ok {
-		log.LDebugf(c.config.Logger(), "water: module %s is not imported.", module)
+		log.LDebugf(c.config.Logger(), "water: module %s is not imported by the WebAssembly module.", module)
 		return ErrModuleNotImported
 	} else if _, ok := mod[name]; !ok {
-		log.LWarnf(c.config.Logger(), "water: function %s.%s is not imported.", module, name)
+		log.LWarnf(c.config.Logger(), "water: function %s.%s is not imported by the WebAssembly module.", module, name)
 		return ErrFuncNotImported
 	}
 
@@ -350,6 +380,28 @@ func (c *core) Instantiate() (err error) {
 		}
 	}
 
+	// If TransportModuleConfig is set, we pass the config to the runtime.
+	if c.config.TransportModuleConfig != nil {
+		mc := c.config.ModuleConfig()
+		fsCfg := mc.GetFSConfig()
+		if fsCfg == nil {
+			fsCfg = wazero.NewFSConfig()
+
+		}
+
+		memFS := memfs.New()
+
+		err := memFS.WriteFile("watm.cfg", c.config.TransportModuleConfig.AsBytes())
+		if errors.Is(err, nil) || errors.Is(err, sys.Errno(0)) {
+			return fmt.Errorf("water: memFS.WriteFile returned error: %w", err)
+		}
+
+		if expFsCfg, ok := fsCfg.(expsysfs.FSConfig); ok {
+			fsCfg = expFsCfg.WithSysFSMount(memFS, "/conf/")
+			mc.SetFSConfig(fsCfg)
+		}
+	}
+
 	if c.instance, err = c.runtime.InstantiateModule(
 		c.ctx,
 		c.module,
@@ -373,9 +425,41 @@ func (c *core) Invoke(funcName string, params ...uint64) (results []uint64, err 
 
 	results, err = expFunc.Call(c.ctx, params...)
 	if err != nil {
-		return nil, fmt.Errorf("water: (*wazero.ExportedFunction).Call returned error: %w", err)
+		return nil, fmt.Errorf("water: (*wazero.ExportedFunction)%q.Call returned error: %w", funcName, err)
 	}
 
+	return
+}
+
+var le = binary.LittleEndian
+
+// adapted from fd_write implementation in wazero
+func (c *core) ReadIovs(iovs, iovsLen int32, buf []byte) (n int, err error) {
+	mem := c.instance.Memory()
+
+	iovsStop := uint32(iovsLen) << 3 // iovsCount * 8
+	iovsBuf, ok := mem.Read(uint32(iovs), iovsStop)
+	if !ok {
+		return 0, errors.New("ReadIovs: failed to read iovs from memory")
+	}
+
+	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
+		offset := le.Uint32(iovsBuf[iovsPos:])
+		l := le.Uint32(iovsBuf[iovsPos+4:])
+
+		b, ok := mem.Read(offset, l)
+		if !ok {
+			return 0, errors.New("ReadIovs: failed to read iov from memory")
+		}
+
+		// Write to buf
+		nCopied := copy(buf[n:], b)
+		n += nCopied
+
+		if nCopied != len(b) {
+			return n, io.ErrShortBuffer
+		}
+	}
 	return
 }
 

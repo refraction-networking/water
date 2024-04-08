@@ -8,6 +8,8 @@ import (
 // if no logger is specifically configured for each component.
 //
 // By default, slog.Default() is used.
+//
+// Deprecated: specify OverrideLogger in the Config instead.
 func SetDefaultLogger(logger *log.Logger) {
 	log.SetDefaultLogger(logger)
 }
@@ -17,6 +19,8 @@ func SetDefaultLogger(logger *log.Logger) {
 // Renamed from SetDefaultHandler.
 //
 // It overrides the logger specified by SetDefaultLogger.
-func SetDefaultLogHandler(handler log.Handler) {
+//
+// Deprecated: specify OverrideLogger in the Config instead.
+func SetDefaultLogHandler(handler log.LogHandler) {
 	log.SetDefaultHandler(handler)
 }

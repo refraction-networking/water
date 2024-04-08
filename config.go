@@ -31,6 +31,14 @@ type Config struct {
 	// 	net.Dial(network, address)
 	NetworkDialerFunc func(network, address string) (net.Conn, error)
 
+	// DialedAddressValidator is an optional field that can be set to validate
+	// the dialed address. It is only used when WATM specifies the remote
+	// address to dial.
+	//
+	// If not set, all addresses are considered invalid. To allow all addresses,
+	// simply set this field to a function that always returns nil.
+	DialedAddressValidator func(network, address string) error
+
 	// NetworkListener specifies a net.listener implementation that listens
 	// on the specified address on the named network. This optional field
 	// will be used to provide (incoming) network connections from a
@@ -44,13 +52,24 @@ type Config struct {
 	// and/or debugging purposes only.
 	//
 	// Caller is supposed to call c.ModuleConfig() to get the pointer to the
-	// ModuleConfigFactory. If the pointer is nil, a new ModuleConfigFactory will
+	// ModuleConfigFactory. If this field is unset, a new ModuleConfigFactory will
 	// be created and returned.
 	ModuleConfigFactory *WazeroModuleConfigFactory
 
+	// RuntimeConfigFactory is used to configure the runtime behavior of
+	// each WASM instance created. This field is for advanced use cases
+	// and/or debugging purposes only.
+	//
+	// Caller is supposed to call c.RuntimeConfig() to get the pointer to the
+	// RuntimeConfigFactory. If this field is unset, a new RuntimeConfigFactory will
+	// be created and returned.
 	RuntimeConfigFactory *WazeroRuntimeConfigFactory
 
-	OverrideLogger *log.Logger // essentially a *slog.Logger, currently using an alias to flatten the version discrepancy
+	// OverrideLogger is a slog.Logger, used by WATER to log messages including
+	// debugging information, warnings, errors that cannot be returned to the caller
+	// of the WATER API. If this field is unset, the default logger from the slog
+	// package will be used.
+	OverrideLogger *log.Logger
 }
 
 // Clone creates a deep copy of the Config.
@@ -63,13 +82,14 @@ func (c *Config) Clone() *Config {
 	copy(wasmClone, c.TransportModuleBin)
 
 	return &Config{
-		TransportModuleBin:    wasmClone,
-		TransportModuleConfig: c.TransportModuleConfig,
-		NetworkDialerFunc:     c.NetworkDialerFunc,
-		NetworkListener:       c.NetworkListener,
-		ModuleConfigFactory:   c.ModuleConfigFactory.Clone(),
-		RuntimeConfigFactory:  c.RuntimeConfigFactory.Clone(),
-		OverrideLogger:        c.OverrideLogger,
+		TransportModuleBin:     wasmClone,
+		TransportModuleConfig:  c.TransportModuleConfig,
+		NetworkDialerFunc:      c.NetworkDialerFunc,
+		DialedAddressValidator: c.DialedAddressValidator,
+		NetworkListener:        c.NetworkListener,
+		ModuleConfigFactory:    c.ModuleConfigFactory.Clone(),
+		RuntimeConfigFactory:   c.RuntimeConfigFactory.Clone(),
+		OverrideLogger:         c.OverrideLogger,
 	}
 }
 
