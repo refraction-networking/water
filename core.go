@@ -17,7 +17,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 
-	"github.com/karelbilek/wazero-fs-tools/memfs"
+	"github.com/gaukas/wazerofs/memfs"
 	expsysfs "github.com/tetratelabs/wazero/experimental/sysfs"
 )
 
