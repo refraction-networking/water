@@ -7,11 +7,11 @@ retract (
 	v0.6.0 // bad LICENSE naming
 )
 
-replace github.com/tetratelabs/wazero => github.com/refraction-networking/wazero v1.7.1-w
+replace github.com/tetratelabs/wazero => github.com/refraction-networking/wazero v1.7.3-w
 
 require (
 	github.com/gaukas/wazerofs v0.1.0
-	github.com/tetratelabs/wazero v1.7.1
+	github.com/tetratelabs/wazero v1.7.3
 	google.golang.org/protobuf v1.33.0
 )
 
