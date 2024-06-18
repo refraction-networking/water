@@ -2,6 +2,7 @@ package v1
 
 import (
 	"fmt"
+	"log"
 	"net"
 )
 
@@ -36,14 +37,38 @@ func (nd *networkDialer) Dial(network, address string) (net.Conn, error) {
 		return nil, fmt.Errorf("address validation: %w", err)
 	}
 
-	return nd.dialerFunc(network, address)
+	conn, err := nd.dialerFunc(network, address)
+	if err != nil {
+		return nil, fmt.Errorf("dialing: %w", err)
+	}
+
+	if network[:3] == "tcp" { // "tcp", "tcp4", "tcp6"
+		if tcpConn, ok := conn.(*net.TCPConn); ok {
+			log.Println("Setting NoDelay for TCP Conn")
+			tcpConn.SetNoDelay(true)
+		}
+	}
+
+	return conn, nil
 }
 
 // DialFixed dials the predetermined address using the dialerFunc of the networkDialer.
 //
 // It should be used only when the caller is not aware of the address to dial.
 func (nd *networkDialer) DialFixed() (net.Conn, error) {
-	return nd.dialerFunc(nd.overrideAddress.network, nd.overrideAddress.address)
+	conn, err := nd.dialerFunc(nd.overrideAddress.network, nd.overrideAddress.address)
+	if err != nil {
+		return nil, fmt.Errorf("dialing: %w", err)
+	}
+
+	if nd.overrideAddress.network[:3] == "tcp" { // "tcp", "tcp4", "tcp6"
+		if tcpConn, ok := conn.(*net.TCPConn); ok {
+			log.Println("Setting NoDelay for TCP Conn")
+			tcpConn.SetNoDelay(true)
+		}
+	}
+
+	return conn, nil
 }
 
 func (nd *networkDialer) HasOverrideAddress() bool {
