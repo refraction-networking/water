@@ -392,7 +392,7 @@ func (c *core) Instantiate() (err error) {
 		memFS := memfs.New()
 
 		err := memFS.WriteFile("watm.cfg", c.config.TransportModuleConfig.AsBytes())
-		if errors.Is(err, nil) || errors.Is(err, sys.Errno(0)) {
+		if !errors.Is(err, nil) && !errors.Is(err, sys.Errno(0)) {
 			return fmt.Errorf("water: memFS.WriteFile returned error: %w", err)
 		}
 
@@ -400,6 +400,8 @@ func (c *core) Instantiate() (err error) {
 			fsCfg = expFsCfg.WithSysFSMount(memFS, "/conf/")
 			mc.SetFSConfig(fsCfg)
 		}
+	} else {
+		log.LWarnf(c.config.Logger(), "water: TransportModuleConfig is not set, skipping...")
 	}
 
 	if c.instance, err = c.runtime.InstantiateModule(
