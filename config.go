@@ -204,6 +204,16 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		}
 	}
 
+	if c.DialedAddressValidator == nil {
+		a := &addressValidator{
+			catchAll:  confJson.Network.AddressValidation.CatchAll,
+			allowlist: confJson.Network.AddressValidation.Allowlist,
+			denylist:  confJson.Network.AddressValidation.Denylist,
+		}
+
+		c.DialedAddressValidator = a.validate
+	}
+
 	if len(confJson.Network.Listener.Network) > 0 && len(confJson.Network.Listener.Address) > 0 {
 		c.NetworkListener, err = net.Listen(confJson.Network.Listener.Network, confJson.Network.Listener.Address)
 		if err != nil {
@@ -279,6 +289,31 @@ func (c *Config) UnmarshalProto(b []byte) error {
 	// Parse TransportModuleConfig if not already set
 	if c.TransportModuleConfig == nil {
 		c.TransportModuleConfig = TransportModuleConfigFromBytes(confProto.GetTransportModule().GetConfig())
+	}
+
+	// Parse DialedAddressValidator if not already set
+	if c.DialedAddressValidator == nil {
+		a := &addressValidator{
+			catchAll: confProto.GetNetwork().GetAddressValidation().GetCatchAll(),
+		}
+
+		allowlist := confProto.GetNetwork().GetAddressValidation().GetAllowlist()
+		if len(allowlist) > 0 {
+			a.allowlist = make(map[string][]string)
+			for k, v := range allowlist {
+				a.allowlist[k] = v.GetNames()
+			}
+		}
+
+		denylist := confProto.GetNetwork().GetAddressValidation().GetDenylist()
+		if len(denylist) > 0 {
+			a.denylist = make(map[string][]string)
+			for k, v := range denylist {
+				a.denylist[k] = v.GetNames()
+			}
+		}
+
+		c.DialedAddressValidator = a.validate
 	}
 
 	// Parse NetworkListener

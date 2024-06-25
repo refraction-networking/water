@@ -12,6 +12,11 @@ type ConfigJSON struct {
 
 	Network struct {
 		// DialerFunc string `json:"dialer_func,omitempty"` // we have no good way to represent a func in JSON format yet
+		AddressValidation struct {
+			CatchAll  bool                `json:"catch_all,omitempty"` // If set, will allow all unspecified addresses. Otherwise, unspecified addresses will be rejected.
+			Allowlist map[string][]string `json:"allowlist,omitempty"` // e.g. {"1.1.1.1:443": ["tcp", "udp"], "1.0.0.1:443": ["tcp"], ...}
+			Denylist  map[string][]string `json:"denylist,omitempty"`  // e.g. {"1.0.0.0:80": ["udp"], ...}
+		} `json:"address_validator,omitempty"`
 		Listener struct {
 			Network string `json:"network"` // e.g. "tcp"
 			Address string `json:"address"` // e.g. "0.0.0.0:0"

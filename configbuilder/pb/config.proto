@@ -18,11 +18,22 @@ message TransportModule {
 
 message Network {
     Listener listener = 1;
+    AddressValidation address_validation = 2;
 }
 
 message Listener {
     string network = 1;
     string address = 2; // ip:port
+}
+
+message AddressValidation {
+    bool catch_all = 1;
+    map<string, NetworkNames> allowlist = 2;
+    map<string, NetworkNames> denylist = 3;
+}
+
+message NetworkNames {
+    repeated string names = 1;
 }
 
 message Module {
