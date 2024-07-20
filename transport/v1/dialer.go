@@ -32,7 +32,8 @@ func NewDialer(c *water.Config) (water.Dialer, error) {
 // NewDialerWithContext creates a new [water.Dialer] from the given [water.Config]
 // with the given [context.Context].
 //
-// The context is used as the default context for call to [Dialer.Dial].
+// The context is used as the underlying background context for the WebAssembly
+// runtime, module, and instance.
 func NewDialerWithContext(ctx context.Context, c *water.Config) (water.Dialer, error) {
 	return &Dialer{
 		config: c.Clone(),
@@ -66,12 +67,12 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (conn
 	go func() {
 		defer dialReady()
 		var core water.Core
-		core, err = water.NewCoreWithContext(ctx, d.config)
+		core, err = water.NewCoreWithContext(d.ctx, d.config)
 		if err != nil {
 			return
 		}
 
-		conn, err = dial(core, network, address)
+		conn, err = dialContext(ctx, core, network, address)
 	}()
 
 	select {

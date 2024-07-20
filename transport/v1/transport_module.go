@@ -1,8 +1,10 @@
 package v1
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"runtime"
 	"sync"
@@ -17,6 +19,10 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
+const (
+	defaultCancelTimeout = 5 * time.Second
+)
+
 // TransportModule acts like a "managed core". It was build to provide WebAssembly
 // Transport Module API-facing functions and utilities that are exclusive to
 // version 0.
@@ -27,7 +33,7 @@ type TransportModule struct {
 	_init func() (int32, error) // watm_init_v1() -> (err i32)
 
 	// _dial_fixed
-	_dial_fixed func(int32) (int32, error) // watm_dial_fixed_v1(callerConnFd i32) -> (remoteConnFd i32)
+	_dial_fixed func(context.Context, int32) (int32, error) // watm_dial_fixed_v1(callerConnFd i32) -> (remoteConnFd i32)
 
 	// _dial:
 	//  - Calls to `env.host_dial() -> fd: i32` to dial a network connection and bind it to one
@@ -36,7 +42,7 @@ type TransportModule struct {
 	//  - Records the `callerConnFd`. This will be the fd it used to read/write data from/to
 	//  the caller.
 	//  - Returns `remoteConnFd` to the caller.
-	_dial func(int32) (int32, error) // watm_dial_v1(callerConnFd i32) -> (remoteConnFd i32)
+	_dial func(context.Context, int32) (int32, error) // watm_dial_v1(callerConnFd i32) -> (remoteConnFd i32)
 
 	// _accept:
 	//  - Calls to `env.host_accept() -> fd: i32` to accept a network connection and bind it
@@ -45,7 +51,7 @@ type TransportModule struct {
 	//  - Records the `callerConnFd`. This will be the fd it used to read/write data from/to
 	//  the caller.
 	//  - Returns `sourceConnFd` to the caller.
-	_accept func(int32) (int32, error) // watm_accept_v1(callerConnFd i32) -> (sourceConnFd i32)
+	_accept func(context.Context, int32) (int32, error) // watm_accept_v1(callerConnFd i32) -> (sourceConnFd i32)
 
 	// _associate:
 	//  - Calls to `env.host_accept() -> fd: i32` to accept a network connection and bind it
@@ -55,7 +61,7 @@ type TransportModule struct {
 	//  of its file descriptors, record the fd for `remoteConnFd`. This will be the fd it used
 	//  to read/write data from/to the remote destination.
 	//  - Returns 0 to the caller or an error code if any of the above steps failed.
-	_associate func() (int32, error) // watm_associate_v1() -> (err i32)
+	_associate func(context.Context) (int32, error) // watm_associate_v1() -> (err i32)
 
 	// backgroundWorker is used to replace the deprecated read-write-close model.
 	// We put it in a inlined struct for better code styling.
@@ -68,7 +74,7 @@ type TransportModule struct {
 		// This is a workaround for not being able to call another WASM function until the
 		// current one returns. And apparently this function needs to be called BEFORE the
 		// blocking _start() function.
-		_ctrlpipe func(int32) (int32, error) // watm_ctrlpipe_v1(fd i32) -> (err i32)
+		_ctrlpipe func(context.Context, int32) (int32, error) // watm_ctrlpipe_v1(fd i32) -> (err i32)
 
 		// _start provides a blocking function for the WASM module to run a worker thread.
 		// In the worker thread, WASM module should select on all previously pushed sockets
@@ -131,7 +137,7 @@ func UpgradeCore(core water.Core) *TransportModule {
 
 // AcceptFor is used to make the Transport Module act as a listener and
 // accept a network connection.
-func (tm *TransportModule) AcceptFor(reverseCallerConn net.Conn) (sourceConn net.Conn, err error) {
+func (tm *TransportModule) AcceptFor(ctx context.Context, reverseCallerConn net.Conn) (sourceConn net.Conn, err error) {
 	// check if _accept is exported
 	if tm._accept == nil {
 		return nil, fmt.Errorf("water: WASM module does not export watm_accept_v1")
@@ -142,7 +148,7 @@ func (tm *TransportModule) AcceptFor(reverseCallerConn net.Conn) (sourceConn net
 		return nil, fmt.Errorf("water: pushing caller conn failed: %w", err)
 	}
 
-	sourceFd, err := tm._accept(callerFd)
+	sourceFd, err := tm._accept(ctx, callerFd)
 	if err != nil {
 		return nil, fmt.Errorf("water: calling _accept: %w", err)
 	} else {
@@ -157,13 +163,13 @@ func (tm *TransportModule) AcceptFor(reverseCallerConn net.Conn) (sourceConn net
 // Associate is used to make the Transport Module act as a relay and
 // associate two network connections, where one is from a source via
 // a listener, and the other is to a destination via a dialer.
-func (tm *TransportModule) Associate() error {
+func (tm *TransportModule) Associate(ctx context.Context) error {
 	// check if _associate is exported
 	if tm._associate == nil {
 		return fmt.Errorf("water: WASM module does not export watm_associate_v1")
 	}
 
-	_, err := tm._associate()
+	_, err := tm._associate(ctx)
 	if err != nil {
 		return fmt.Errorf("water: calling _associate function returned error: %w", err)
 	}
@@ -174,9 +180,10 @@ func (tm *TransportModule) Associate() error {
 // the error returned by the worker thread. This call is designed
 // to block until the worker thread exits.
 //
-// If a timeout is set, this function will cancel the underlying
-// context to terminate the WebAssembly execution if the worker
-// does not exit before the timeout.
+// If a timeout is set, this function will close the underlying
+// runtime core to force the WebAssembly execution to terminate
+// if the worker thread does not exit within the timeout. There's
+// a default timeout of 5 seconds if no timeout is set.
 func (tm *TransportModule) Cancel(timeout time.Duration) error {
 	if tm.backgroundWorker == nil {
 		return fmt.Errorf("water: Transport Module is not initialized")
@@ -202,29 +209,31 @@ func (tm *TransportModule) Cancel(timeout time.Duration) error {
 		return fmt.Errorf("water: writing to cancel pipe failed: %w", err)
 	}
 
-	if timeout > 0 { // if timeout is set, we set the context to expire after the timeout
-		select {
-		case <-time.After(timeout):
-			tm.core.ContextCancel() // if not exited before timeout, cancel the context to terminate the WebAssembly execution
-		case <-tm.backgroundWorker.exited:
-			if err := tm.ExitedWith(); err != nil {
-				return fmt.Errorf("water: worker thread returned error: %w", err)
-			}
-			return nil
+	if timeout == 0 {
+		timeout = defaultCancelTimeout
+	}
+
+	select {
+	case <-time.After(timeout):
+		log.LDebugf(tm.Core().Logger(), "water: force cancelling worker thread since it did not exit within %v", timeout)
+		if err := tm.core.Close(); err != nil { // if not exited before timeout, close the runtime core to force the WebAssembly execution to terminate
+			log.LDebugf(tm.Core().Logger(), "water: closing runtime core failed: %v", err)
 		}
-	}
-	// wait for the worker thread to exit, may take forever
-	if err := tm.WaitWorker(); err != nil {
-		return fmt.Errorf("water: worker thread returned error: %w", err)
+		// wait for the worker thread to exit, may take forever
+		if err := tm.WaitWorker(); err != nil {
+			return fmt.Errorf("water: worker thread returned error: %w", err)
+		}
+		return nil
+	case <-tm.backgroundWorker.exited:
+		log.LDebugf(tm.Core().Logger(), "water: worker thread exited within %v", timeout)
+		if err := tm.ExitedWith(); err != nil {
+			return fmt.Errorf("water: worker thread returned error: %w", err)
+		}
+		return nil
 	}
 
-	if err := tm.backgroundWorker.controlPipe.Close(); err != nil {
-		return fmt.Errorf("water: closing cancel pipe failed: %w", err)
-	}
-
-	tm.backgroundWorker.controlPipe = nil
-
-	return nil
+	// We don't need to handle ControlPipe here. Since it is also pushed into the Transport Module
+	// via PushConn, it will be closed when the Transport Module is cleaned up.
 }
 
 // Clean up the Transport Module by closing all connections pushed into the Transport Module.
@@ -255,14 +264,14 @@ func (tm *TransportModule) Cleanup() {
 	tm._associate = nil
 	tm.backgroundWorker._ctrlpipe = nil
 	tm.backgroundWorker._start = nil
+	tm.backgroundWorker.controlPipe = nil
 }
 
 func (tm *TransportModule) Close() error {
 	var err error
 
 	tm.closeOnce.Do(func() {
-		tm.DeferAll()
-		err = tm.Cancel(0) // may wait forever
+		err = tm.Cancel(defaultCancelTimeout)
 		tm.Cleanup()
 		tm.coreMutex.Lock()
 		if tm.core != nil {
@@ -275,7 +284,14 @@ func (tm *TransportModule) Close() error {
 	return err
 }
 
-func (tm *TransportModule) DialFixedFrom(reverseCallerConn net.Conn) (destConn net.Conn, err error) {
+func (tm *TransportModule) Core() water.Core {
+	tm.coreMutex.RLock()
+	core := tm.core
+	defer tm.coreMutex.RUnlock()
+	return core
+}
+
+func (tm *TransportModule) DialFixedFrom(ctx context.Context, reverseCallerConn net.Conn) (destConn net.Conn, err error) {
 	// check if _connect is exported
 	if tm._dial_fixed == nil {
 		return nil, fmt.Errorf("water: WASM module does not export watm_dial_fixed_v1")
@@ -286,7 +302,7 @@ func (tm *TransportModule) DialFixedFrom(reverseCallerConn net.Conn) (destConn n
 		return nil, fmt.Errorf("water: pushing caller conn failed: %w", err)
 	}
 
-	remoteFd, err := tm._dial_fixed(callerFd)
+	remoteFd, err := tm._dial_fixed(ctx, callerFd)
 	if err != nil {
 		return nil, fmt.Errorf("water: calling _dial_fixed: %w", err)
 	} else {
@@ -298,31 +314,12 @@ func (tm *TransportModule) DialFixedFrom(reverseCallerConn net.Conn) (destConn n
 	}
 }
 
-func (tm *TransportModule) Core() water.Core {
-	tm.coreMutex.RLock()
-	core := tm.core
-	defer tm.coreMutex.RUnlock()
-	return core
-}
-
-func (tm *TransportModule) Defer(f func()) {
-	tm.deferredFuncs = append(tm.deferredFuncs, f)
-}
-
-func (tm *TransportModule) DeferAll() {
-	tm.deferOnce.Do(func() { // execute all deferred functions ONLY IF not yet executed
-		for _, f := range tm.deferredFuncs {
-			f()
-		}
-	})
-}
-
 // DialFrom is used to make the Transport Module act as a dialer and
 // dial a network connection.
 //
 // Takes the reverse caller connection as an argument, which is used
 // to communicate with the caller.
-func (tm *TransportModule) DialFrom(reverseCallerConn net.Conn) (destConn net.Conn, err error) {
+func (tm *TransportModule) DialFrom(ctx context.Context, reverseCallerConn net.Conn) (destConn net.Conn, err error) {
 	// check if _dial is exported
 	if tm._dial == nil {
 		return nil, fmt.Errorf("water: WASM module does not export watm_dial_v1")
@@ -333,7 +330,7 @@ func (tm *TransportModule) DialFrom(reverseCallerConn net.Conn) (destConn net.Co
 		return nil, fmt.Errorf("water: pushing caller conn failed: %w", err)
 	}
 
-	remoteFd, err := tm._dial(callerFd)
+	remoteFd, err := tm._dial(ctx, callerFd)
 	if err != nil {
 		return nil, fmt.Errorf("water: calling _dial: %w", err)
 	} else {
@@ -379,8 +376,11 @@ func (tm *TransportModule) GetManagedConns(fd int32) net.Conn {
 	return nil
 }
 
-// Initialize initializes the WASMv0 runtime by getting all the exported functions from
-// the WASM module.
+// Initialize verifies the WebAssembly Transport Module loaded meets the
+// WATM v1 specification and create bindings to all exported functions.
+// It also calls the _init function to initialize the WATM.
+//
+// TODO: remove _init in WATM v1.
 //
 // All imports must be set before calling this function.
 func (tm *TransportModule) Initialize() error {
@@ -398,8 +398,6 @@ func (tm *TransportModule) Initialize() error {
 	if err = tm.Core().Instantiate(); err != nil {
 		return err
 	}
-
-	coreCtx := tm.Core().Context()
 
 	// _init
 	init := tm.Core().ExportedFunction("watm_init_v1")
@@ -419,135 +417,9 @@ func (tm *TransportModule) Initialize() error {
 		}
 
 		tm._init = func() (int32, error) {
-			ret, err := init.Call(coreCtx)
+			ret, err := init.Call(tm.Core().Context())
 			if err != nil {
 				return 0, fmt.Errorf("water: calling watm_init_v1 function returned error: %w", err)
-			}
-
-			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
-		}
-	}
-
-	// _dial_fixed
-	dial_fixed := tm.Core().ExportedFunction("watm_dial_fixed_v1")
-	if dial_fixed == nil {
-		log.LWarnf(tm.Core().Logger(), "water: WASM module does not export watm_dial_fixed_v1, water.Dialer will not work.")
-		tm._dial_fixed = func(callerFd int32) (int32, error) {
-			return 0, water.ErrUnimplementedFixedDialer
-		}
-	} else {
-		// check signature:
-		//  watm_dial_fixed_v1(callerFd i32) -> (remoteFd i32)
-		if len(dial_fixed.Definition().ParamTypes()) != 1 {
-			return fmt.Errorf("water: watm_dial_fixed_v1 function expects 1 argument, got %d", len(dial_fixed.Definition().ParamTypes()))
-		} else if dial_fixed.Definition().ParamTypes()[0] != api.ValueTypeI32 {
-			return fmt.Errorf("water: watm_dial_fixed_v1 function expects argument type i32, got %s", api.ValueTypeName(dial_fixed.Definition().ParamTypes()[0]))
-		}
-
-		if len(dial_fixed.Definition().ResultTypes()) != 1 {
-			return fmt.Errorf("water: watm_dial_fixed_v1 function expects 1 result, got %d", len(dial_fixed.Definition().ResultTypes()))
-		} else if dial_fixed.Definition().ResultTypes()[0] != api.ValueTypeI32 {
-			return fmt.Errorf("water: watm_dial_fixed_v1 function expects result type i32, got %s", api.ValueTypeName(dial_fixed.Definition().ResultTypes()[0]))
-		}
-
-		tm._dial_fixed = func(callerFd int32) (int32, error) {
-			ret, err := dial_fixed.Call(coreCtx, api.EncodeI32(callerFd))
-			if err != nil {
-				return 0, fmt.Errorf("water: calling watm_dial_fixed_v1 function returned error: %w", err)
-			}
-
-			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
-		}
-	}
-
-	// _dial
-	dial := tm.Core().ExportedFunction("watm_dial_v1")
-	if dial == nil {
-		log.LWarnf(tm.Core().Logger(), "water: WASM module does not export watm_dial_v1, water.Dialer will not work.")
-		tm._dial = func(callerFd int32) (int32, error) {
-			return 0, water.ErrUnimplementedDialer
-		}
-	} else {
-		// check signature:
-		//  watm_dial_v1(callerFd i32) -> (remoteFd i32)
-		if len(dial.Definition().ParamTypes()) != 1 {
-			return fmt.Errorf("water: watm_dial_v1 function expects 1 argument, got %d", len(dial.Definition().ParamTypes()))
-		} else if dial.Definition().ParamTypes()[0] != api.ValueTypeI32 {
-			return fmt.Errorf("water: watm_dial_v1 function expects argument type i32, got %s", api.ValueTypeName(dial.Definition().ParamTypes()[0]))
-		}
-
-		if len(dial.Definition().ResultTypes()) != 1 {
-			return fmt.Errorf("water: watm_dial_v1 function expects 1 result, got %d", len(dial.Definition().ResultTypes()))
-		} else if dial.Definition().ResultTypes()[0] != api.ValueTypeI32 {
-			return fmt.Errorf("water: watm_dial_v1 function expects result type i32, got %s", api.ValueTypeName(dial.Definition().ResultTypes()[0]))
-		}
-
-		tm._dial = func(callerFd int32) (int32, error) {
-			ret, err := dial.Call(coreCtx, api.EncodeI32(callerFd))
-			if err != nil {
-				return 0, fmt.Errorf("water: calling watm_dial_v1 function returned error: %w", err)
-			}
-
-			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
-		}
-	}
-
-	// _accept
-	accept := tm.Core().ExportedFunction("watm_accept_v1")
-	if accept == nil {
-		log.LWarnf(tm.Core().Logger(), "water: WASM module does not export watm_accept_v1, water.Listener will not work.")
-		tm._accept = func(callerFd int32) (int32, error) {
-			return 0, water.ErrUnimplementedListener
-		}
-	} else {
-		// check signature:
-		//  watm_accept_v1(callerFd i32) -> (sourceFd i32)
-		if len(accept.Definition().ParamTypes()) != 1 {
-			return fmt.Errorf("water: watm_accept_v1 function expects 1 argument, got %d", len(accept.Definition().ParamTypes()))
-		} else if accept.Definition().ParamTypes()[0] != api.ValueTypeI32 {
-			return fmt.Errorf("water: watm_accept_v1 function expects argument type i32, got %s", api.ValueTypeName(accept.Definition().ParamTypes()[0]))
-		}
-
-		if len(accept.Definition().ResultTypes()) != 1 {
-			return fmt.Errorf("water: watm_accept_v1 function expects 1 result, got %d", len(accept.Definition().ResultTypes()))
-		} else if accept.Definition().ResultTypes()[0] != api.ValueTypeI32 {
-			return fmt.Errorf("water: watm_accept_v1 function expects result type i32, got %s", api.ValueTypeName(accept.Definition().ParamTypes()[0]))
-		}
-
-		tm._accept = func(callerFd int32) (int32, error) {
-			ret, err := accept.Call(coreCtx, api.EncodeI32(callerFd))
-			if err != nil {
-				return 0, fmt.Errorf("water: calling watm_accept_v1 function returned error: %w", err)
-			}
-
-			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
-		}
-	}
-
-	// _associate
-	associate := tm.Core().ExportedFunction("watm_associate_v1")
-	if associate == nil {
-		log.LWarnf(tm.Core().Logger(), "water: WASM module does not export watm_associate_v1, water.Relay will not work.")
-		tm._associate = func() (int32, error) {
-			return 0, water.ErrUnimplementedRelay
-		}
-	} else {
-		// check signature:
-		//  watm_associate_v1() -> (err i32)
-		if len(associate.Definition().ParamTypes()) != 0 {
-			return fmt.Errorf("water: watm_associate_v1 function expects 0 argument, got %d", len(associate.Definition().ParamTypes()))
-		}
-
-		if len(associate.Definition().ResultTypes()) != 1 {
-			return fmt.Errorf("water: watm_associate_v1 function expects 1 result, got %d", len(associate.Definition().ResultTypes()))
-		} else if associate.Definition().ResultTypes()[0] != api.ValueTypeI32 {
-			return fmt.Errorf("water: watm_associate_v1 function expects result type i32, got %s", api.ValueTypeName(associate.Definition().ResultTypes()[0]))
-		}
-
-		tm._associate = func() (int32, error) {
-			ret, err := associate.Call(coreCtx)
-			if err != nil {
-				return 0, fmt.Errorf("water: calling watm_associate_v1 function returned error: %w", err)
 			}
 
 			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
@@ -594,14 +466,14 @@ func (tm *TransportModule) Initialize() error {
 
 	// set up the background worker
 	tm.backgroundWorker = &struct {
-		_ctrlpipe   func(int32) (int32, error)
+		_ctrlpipe   func(context.Context, int32) (int32, error)
 		_start      func() (int32, error)
 		exited      chan bool
 		exitedWith  atomic.Value
 		controlPipe *CtrlPipe
 	}{
-		_ctrlpipe: func(fd int32) (int32, error) {
-			ret, err := ctrlPipe.Call(coreCtx, api.EncodeI32(fd))
+		_ctrlpipe: func(ctx context.Context, fd int32) (int32, error) {
+			ret, err := ctrlPipe.Call(ctx, api.EncodeI32(fd))
 			if err != nil {
 				return 0, fmt.Errorf("water: calling watm_ctrlpipe_v1 function returned error: %w", err)
 			}
@@ -609,7 +481,12 @@ func (tm *TransportModule) Initialize() error {
 			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
 		},
 		_start: func() (int32, error) {
-			ret, err := start.Call(coreCtx)
+			go func() {
+				<-tm.Core().Context().Done()
+				tm.Close() // this is to unblock the potential syscall (poll_oneoff) which will not be interrupted by the context cancellation.
+			}()
+
+			ret, err := start.Call(tm.Core().Context())
 			if err != nil {
 				return 0, fmt.Errorf("water: calling watm_start_v1 function returned error: %w", err)
 			}
@@ -621,6 +498,148 @@ func (tm *TransportModule) Initialize() error {
 		// controlPipe: nil,
 	}
 
+	// _dial_fixed
+	dial_fixed := tm.Core().ExportedFunction("watm_dial_fixed_v1")
+	if dial_fixed == nil {
+		log.LWarnf(tm.Core().Logger(), "water: WASM module does not export watm_dial_fixed_v1, water.Dialer will not work.")
+		tm._dial_fixed = func(context.Context, int32) (int32, error) {
+			return 0, water.ErrUnimplementedFixedDialer
+		}
+	} else {
+		// check signature:
+		//  watm_dial_fixed_v1(callerFd i32) -> (remoteFd i32)
+		if len(dial_fixed.Definition().ParamTypes()) != 1 {
+			return fmt.Errorf("water: watm_dial_fixed_v1 function expects 1 argument, got %d", len(dial_fixed.Definition().ParamTypes()))
+		} else if dial_fixed.Definition().ParamTypes()[0] != api.ValueTypeI32 {
+			return fmt.Errorf("water: watm_dial_fixed_v1 function expects argument type i32, got %s", api.ValueTypeName(dial_fixed.Definition().ParamTypes()[0]))
+		}
+
+		if len(dial_fixed.Definition().ResultTypes()) != 1 {
+			return fmt.Errorf("water: watm_dial_fixed_v1 function expects 1 result, got %d", len(dial_fixed.Definition().ResultTypes()))
+		} else if dial_fixed.Definition().ResultTypes()[0] != api.ValueTypeI32 {
+			return fmt.Errorf("water: watm_dial_fixed_v1 function expects result type i32, got %s", api.ValueTypeName(dial_fixed.Definition().ResultTypes()[0]))
+		}
+
+		tm._dial_fixed = func(ctx context.Context, callerFd int32) (int32, error) {
+			if err := tm.ControlPipe(ctx); err != nil {
+				return 0, fmt.Errorf("water: setting up control pipe failed: %w", err)
+			}
+
+			ret, err := dial_fixed.Call(ctx, api.EncodeI32(callerFd))
+			if err != nil {
+				return 0, fmt.Errorf("water: calling watm_dial_fixed_v1 function returned error: %w", err)
+			}
+
+			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
+		}
+	}
+
+	// _dial
+	dial := tm.Core().ExportedFunction("watm_dial_v1")
+	if dial == nil {
+		log.LWarnf(tm.Core().Logger(), "water: WASM module does not export watm_dial_v1, water.Dialer will not work.")
+		tm._dial = func(context.Context, int32) (int32, error) {
+			return 0, water.ErrUnimplementedDialer
+		}
+	} else {
+		// check signature:
+		//  watm_dial_v1(callerFd i32) -> (remoteFd i32)
+		if len(dial.Definition().ParamTypes()) != 1 {
+			return fmt.Errorf("water: watm_dial_v1 function expects 1 argument, got %d", len(dial.Definition().ParamTypes()))
+		} else if dial.Definition().ParamTypes()[0] != api.ValueTypeI32 {
+			return fmt.Errorf("water: watm_dial_v1 function expects argument type i32, got %s", api.ValueTypeName(dial.Definition().ParamTypes()[0]))
+		}
+
+		if len(dial.Definition().ResultTypes()) != 1 {
+			return fmt.Errorf("water: watm_dial_v1 function expects 1 result, got %d", len(dial.Definition().ResultTypes()))
+		} else if dial.Definition().ResultTypes()[0] != api.ValueTypeI32 {
+			return fmt.Errorf("water: watm_dial_v1 function expects result type i32, got %s", api.ValueTypeName(dial.Definition().ResultTypes()[0]))
+		}
+
+		tm._dial = func(ctx context.Context, callerFd int32) (int32, error) {
+			if err := tm.ControlPipe(ctx); err != nil {
+				return 0, fmt.Errorf("water: setting up control pipe failed: %w", err)
+			}
+
+			ret, err := dial.Call(ctx, api.EncodeI32(callerFd))
+			if err != nil {
+				return 0, fmt.Errorf("water: calling watm_dial_v1 function returned error: %w", err)
+			}
+
+			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
+		}
+	}
+
+	// _accept
+	accept := tm.Core().ExportedFunction("watm_accept_v1")
+	if accept == nil {
+		log.LWarnf(tm.Core().Logger(), "water: WASM module does not export watm_accept_v1, water.Listener will not work.")
+		tm._accept = func(context.Context, int32) (int32, error) {
+			return 0, water.ErrUnimplementedListener
+		}
+	} else {
+		// check signature:
+		//  watm_accept_v1(callerFd i32) -> (sourceFd i32)
+		if len(accept.Definition().ParamTypes()) != 1 {
+			return fmt.Errorf("water: watm_accept_v1 function expects 1 argument, got %d", len(accept.Definition().ParamTypes()))
+		} else if accept.Definition().ParamTypes()[0] != api.ValueTypeI32 {
+			return fmt.Errorf("water: watm_accept_v1 function expects argument type i32, got %s", api.ValueTypeName(accept.Definition().ParamTypes()[0]))
+		}
+
+		if len(accept.Definition().ResultTypes()) != 1 {
+			return fmt.Errorf("water: watm_accept_v1 function expects 1 result, got %d", len(accept.Definition().ResultTypes()))
+		} else if accept.Definition().ResultTypes()[0] != api.ValueTypeI32 {
+			return fmt.Errorf("water: watm_accept_v1 function expects result type i32, got %s", api.ValueTypeName(accept.Definition().ParamTypes()[0]))
+		}
+
+		tm._accept = func(ctx context.Context, callerFd int32) (int32, error) {
+			if err := tm.ControlPipe(ctx); err != nil {
+				return 0, fmt.Errorf("water: setting up control pipe failed: %w", err)
+			}
+
+			ret, err := accept.Call(ctx, api.EncodeI32(callerFd))
+			if err != nil {
+				return 0, fmt.Errorf("water: calling watm_accept_v1 function returned error: %w", err)
+			}
+
+			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
+		}
+	}
+
+	// _associate
+	associate := tm.Core().ExportedFunction("watm_associate_v1")
+	if associate == nil {
+		log.LWarnf(tm.Core().Logger(), "water: WASM module does not export watm_associate_v1, water.Relay will not work.")
+		tm._associate = func(context.Context) (int32, error) {
+			return 0, water.ErrUnimplementedRelay
+		}
+	} else {
+		// check signature:
+		//  watm_associate_v1() -> (err i32)
+		if len(associate.Definition().ParamTypes()) != 0 {
+			return fmt.Errorf("water: watm_associate_v1 function expects 0 argument, got %d", len(associate.Definition().ParamTypes()))
+		}
+
+		if len(associate.Definition().ResultTypes()) != 1 {
+			return fmt.Errorf("water: watm_associate_v1 function expects 1 result, got %d", len(associate.Definition().ResultTypes()))
+		} else if associate.Definition().ResultTypes()[0] != api.ValueTypeI32 {
+			return fmt.Errorf("water: watm_associate_v1 function expects result type i32, got %s", api.ValueTypeName(associate.Definition().ResultTypes()[0]))
+		}
+
+		tm._associate = func(ctx context.Context) (int32, error) {
+			if err := tm.ControlPipe(ctx); err != nil {
+				return 0, fmt.Errorf("water: setting up control pipe failed: %w", err)
+			}
+
+			ret, err := associate.Call(ctx)
+			if err != nil {
+				return 0, fmt.Errorf("water: calling watm_associate_v1 function returned error: %w", err)
+			}
+
+			return wasip1.DecodeWATERError(api.DecodeI32(ret[0]))
+		}
+	}
+
 	// call _init
 	if errno, err := tm._init(); err != nil {
 		return fmt.Errorf("water: calling watm_init_v1 function returned error: %w", err)
@@ -628,6 +647,36 @@ func (tm *TransportModule) Initialize() error {
 		_, err := wasip1.DecodeWATERError(errno)
 		return err
 	}
+}
+
+func (tm *TransportModule) ControlPipe(ctx context.Context) error {
+	// create control pipe connection pair
+	ctrlConnR, ctrlConnW, err := socket.TCPConnPair()
+	if err != nil {
+		return fmt.Errorf("water: creating cancel pipe failed: %w", err)
+	}
+
+	if tm.backgroundWorker == nil {
+		return fmt.Errorf("water: Transport Module is not initialized")
+	}
+
+	tm.backgroundWorker.controlPipe = &CtrlPipe{
+		Conn: ctrlConnW,
+	} // host will Write to this pipe to cancel the worker
+
+	// push cancel pipe
+	ctrlPipeFd, err := tm.PushConn(ctrlConnR)
+	if err != nil {
+		return fmt.Errorf("water: pushing cancel pipe failed: %w", err)
+	}
+
+	// pass the fd to the WASM module
+	_, err = tm.backgroundWorker._ctrlpipe(ctx, ctrlPipeFd)
+	if err != nil {
+		return fmt.Errorf("water: calling watm_ctrlpipe_v1: %w", err)
+	}
+
+	return nil
 }
 
 func (tm *TransportModule) LinkNetworkInterface(dialer *networkDialer, listener net.Listener) error {
@@ -763,34 +812,17 @@ func (tm *TransportModule) PushConn(conn net.Conn) (fd int32, err error) {
 // Worker spins up a worker thread for the WATM to run a blocking function, which is
 // expected to be the mainloop.
 //
+// Optionally you may pass in a list of io.Closer to be closed when the worker thread
+// exits. This is useful for cleaning up resources that are not managed by the Transport
+// Module.
+//
 // This function is non-blocking, so it will not return any error once the WebAssembly
 // worker thread is started. To get the error, use [TransportModule.WaitWorker] or
 // [TransportModule.ExitedWith].
-func (tm *TransportModule) StartWorker() error {
+func (tm *TransportModule) StartWorker(closers ...io.Closer) error {
 	// check if _worker is exported
 	if tm.backgroundWorker == nil {
 		return fmt.Errorf("water: Transport Module is not initialized properly for background worker")
-	}
-
-	// create control pipe connection pair
-	ctrlConnR, ctrlConnW, err := socket.TCPConnPair()
-	if err != nil {
-		return fmt.Errorf("water: creating cancel pipe failed: %w", err)
-	}
-	tm.backgroundWorker.controlPipe = &CtrlPipe{
-		Conn: ctrlConnW,
-	} // host will Write to this pipe to cancel the worker
-
-	// push cancel pipe
-	ctrlPipeFd, err := tm.PushConn(ctrlConnR)
-	if err != nil {
-		return fmt.Errorf("water: pushing cancel pipe failed: %w", err)
-	}
-
-	// pass the fd to the WASM module
-	_, err = tm.backgroundWorker._ctrlpipe(ctrlPipeFd)
-	if err != nil {
-		return fmt.Errorf("water: calling watm_ctrlpipe_v1: %w", err)
 	}
 
 	log.LDebugf(tm.Core().Logger(), "water: starting worker thread")
@@ -798,6 +830,14 @@ func (tm *TransportModule) StartWorker() error {
 	// in a goroutine, call _worker
 	go func() {
 		defer close(tm.backgroundWorker.exited)
+		defer func(toClose []io.Closer) {
+			for _, closer := range toClose {
+				if closer != nil {
+					closer.Close()
+				}
+			}
+		}(closers)
+
 		_, err := tm.backgroundWorker._start()
 		if err != nil && !errors.Is(err, syscall.ECANCELED) {
 			log.LErrorf(tm.Core().Logger(), "water: WATM worker thread exited with error: %v", err)
@@ -806,6 +846,7 @@ func (tm *TransportModule) StartWorker() error {
 			// tm.backgroundWorker.exitedWith.Store(nil) // can't store nil value
 			log.LDebugf(tm.Core().Logger(), "water: WATM worker thread exited without error")
 		}
+
 	}()
 
 	log.LDebugf(tm.Core().Logger(), "water: worker thread started")

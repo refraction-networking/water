@@ -79,31 +79,13 @@ func ExampleDialer() {
 //  4. Dialer must fail when a WebAssembly Transport Module does not
 //     fully implement the v1 dialer spec.
 func TestDialer(t *testing.T) {
-	t.Run("plain must work", testDialerPlain)
-	t.Run("reverse must work", testDialerReverse)
-	t.Run("bad addr must fail", testDialerBadAddr)
-	t.Run("partial WATM must fail", testDialerPartialWATM)
+	t.Run("PlainTransport", testDialer_Plain)
+	t.Run("ReverseTransport", testDialer_Reverse)
+	t.Run("DialBadAddress", testDialer_BadAddr)
+	t.Run("ContextExpireAfterConnCreation", testDialer_ContextExpireAfterConnCreation)
 }
 
-func testDialerBadAddr(t *testing.T) {
-	// Dial
-	config := &water.Config{
-		TransportModuleBin:  wasmPlain,
-		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
-	}
-
-	dialer, err := v1.NewDialerWithContext(context.Background(), config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = dialer.DialContext(context.Background(), "tcp", "256.267.278.289:2023")
-	if err == nil {
-		t.Fatal("dialer.Dial should fail")
-	}
-}
-
-func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
+func testDialer_Plain(t *testing.T) { // skipcq: GO-R1005
 	tcpLis, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
@@ -229,7 +211,7 @@ func testDialerPlain(t *testing.T) { // skipcq: GO-R1005
 	tripleGC(100 * time.Microsecond)
 }
 
-func testDialerReverse(t *testing.T) { // skipcq: GO-R1005
+func testDialer_Reverse(t *testing.T) { // skipcq: GO-R1005
 	tcpLis, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
@@ -365,8 +347,143 @@ func testDialerReverse(t *testing.T) { // skipcq: GO-R1005
 	tripleGC(100 * time.Microsecond)
 }
 
-func testDialerPartialWATM(t *testing.T) {
-	t.Skip("skipping [testDialerPartialWATM]...") // TODO: implement this with a few WebAssembly Transport Modules which partially implement the v1 dialer spec
+func testDialer_BadAddr(t *testing.T) {
+	// Dial
+	config := &water.Config{
+		TransportModuleBin:  wasmPlain,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
+	}
+
+	dialer, err := v1.NewDialerWithContext(context.Background(), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = dialer.DialContext(context.Background(), "tcp", "256.267.278.289:2023")
+	if err == nil {
+		t.Fatal("dialer.Dial should fail")
+	}
+}
+
+func testDialer_ContextExpireAfterConnCreation(t *testing.T) {
+	tcpLis, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tcpLis.Close() // skipcq: GO-S2307
+
+	// Dial using water
+	config := &water.Config{
+		TransportModuleBin:   wasmPlain,
+		ModuleConfigFactory:  water.NewWazeroModuleConfigFactory(),
+		RuntimeConfigFactory: water.NewWazeroRuntimeConfigFactory(),
+	}
+	config.RuntimeConfigFactory.SetCloseOnContextDone(true)
+
+	coreCtx, coreCtxCancel := context.WithCancel(context.Background())
+
+	dialer, err := v1.NewDialerWithContext(coreCtx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dialCtx, dialCtxCancel := context.WithCancel(context.Background())
+
+	conn, err := dialer.DialContext(dialCtx, "tcp", tcpLis.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close() // skipcq: GO-S2307
+
+	// type assertion: conn must be *v1.Conn
+	if _, ok := conn.(*v1.Conn); !ok {
+		t.Fatalf("returned conn is not *v1.Conn")
+	}
+
+	peerConn, err := tcpLis.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer peerConn.Close() // skipcq: GO-S2307
+
+	tripleGC(100 * time.Microsecond)
+
+	var wrBuf []byte = make([]byte, 128)
+	var rdBuf []byte = make([]byte, 128)
+
+	// send a message, it must be received by the peer
+	n, err := rand.Read(wrBuf)
+	if err != nil {
+		t.Fatalf("rand.Read error: %s", err)
+	}
+
+	nWr, err := conn.Write(wrBuf)
+	if err != nil {
+		t.Fatalf("conn.Write error: %s", err)
+	}
+
+	if nWr != n {
+		t.Fatalf("conn.Write error: wrote %d bytes, want %d bytes", nWr, n)
+	}
+
+	nRd, err := peerConn.Read(rdBuf)
+	if err != nil {
+		t.Fatalf("peerConn.Read error: %s", err)
+	}
+
+	if nRd != n {
+		t.Fatalf("peerConn.Read error: read %d bytes, want %d bytes", nRd, n)
+	}
+
+	if !bytes.Equal(wrBuf[:n], rdBuf[:n]) {
+		t.Fatalf("wrBuf != rdBuf")
+	}
+
+	// cancel the dial context
+	dialCtxCancel()
+
+	// now the conn must be still alive
+	nWr, err = peerConn.Write(wrBuf)
+	if err != nil {
+		t.Fatalf("peerConn.Write error: %v", err)
+	}
+
+	nRd, err = conn.Read(rdBuf)
+	if err != nil {
+		t.Fatalf("conn.Read error: %v", err)
+	}
+
+	if nWr != nRd {
+		t.Fatalf("conn.Read error: read %d bytes, want %d bytes", nRd, nWr)
+	}
+
+	if !bytes.Equal(wrBuf[:nWr], rdBuf[:nRd]) {
+		t.Fatalf("wrBuf != rdBuf")
+	}
+
+	// cancel the core context
+	coreCtxCancel()
+	<-coreCtx.Done()
+	time.Sleep(100 * time.Millisecond)
+
+	// now the conn must be closed, read and/or write must fail
+	_, err = conn.Write(wrBuf)
+	if err == nil {
+		t.Fatalf("conn.Write must fail after closing the conn")
+	} else {
+		t.Logf("conn.Write error: %v", err)
+	}
+
+	_, err = conn.Read(rdBuf)
+	if err == nil {
+		t.Fatalf("conn.Read must fail after closing the conn")
+	} else {
+		t.Logf("conn.Read error: %v", err)
+	}
+
+	if err := tcpLis.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // BenchmarkDialerOutbound currently measures only the outbound throughput
@@ -551,7 +668,6 @@ func TestFixedDialer(t *testing.T) {
 	t.Run("plain must work", testFixedDialerPlain)
 	t.Run("reverse must work", testFixedDialerReverse)
 	t.Run("bad addr must fail", testFixedDialerBadAddr)
-	t.Run("partial WATM must fail", testFixedDialerPartialWATM)
 }
 
 func testFixedDialerBadAddr(t *testing.T) {
@@ -850,8 +966,4 @@ func testFixedDialerReverse(t *testing.T) { // skipcq: GO-R1005
 	}
 
 	tripleGC(100 * time.Microsecond)
-}
-
-func testFixedDialerPartialWATM(t *testing.T) {
-	t.Skip("skipping [testFixedDialerPartialWATM]...") // TODO: implement this with a few WebAssembly Transport Modules which partially implement the v1 dialer spec
 }

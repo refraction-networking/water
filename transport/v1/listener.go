@@ -18,9 +18,10 @@ func init() {
 
 // Listener implements [water.Listener] utilizing Water WATM API v1.
 type Listener struct {
-	config *water.Config
-	closed *atomic.Bool
-	ctx    context.Context
+	config    *water.Config
+	closed    *atomic.Bool
+	ctx       context.Context
+	ctxCancel context.CancelFunc
 
 	water.UnimplementedListener // embedded to ensure forward compatibility
 }
@@ -29,10 +30,7 @@ type Listener struct {
 //
 // Deprecated: use [NewListenerWithContext] instead.
 func NewListener(c *water.Config) (water.Listener, error) {
-	return &Listener{
-		config: c.Clone(),
-		closed: new(atomic.Bool),
-	}, nil
+	return NewListenerWithContext(context.Background(), c)
 }
 
 // NewListenerWithContext creates a new [water.Listener] from the [water.Config] with
@@ -45,10 +43,13 @@ func NewListener(c *water.Config) (water.Listener, error) {
 // Call [water.WazeroRuntimeConfigFactory.SetCloseOnContextDone] with false to
 // disable this behavior.
 func NewListenerWithContext(ctx context.Context, c *water.Config) (water.Listener, error) {
+	ctx, cancel := context.WithCancel(ctx)
+
 	return &Listener{
-		config: c.Clone(),
-		closed: new(atomic.Bool),
-		ctx:    ctx,
+		config:    c.Clone(),
+		closed:    new(atomic.Bool),
+		ctx:       ctx,
+		ctxCancel: cancel,
 	}, nil
 }
 
@@ -69,8 +70,10 @@ func (l *Listener) Accept() (net.Conn, error) {
 // Implements [net.Listener].
 func (l *Listener) Close() error {
 	if l.closed.CompareAndSwap(false, true) {
+		l.ctxCancel()
 		return l.config.NetworkListener.Close()
 	}
+
 	return nil
 }
 
@@ -96,10 +99,10 @@ func (l *Listener) AcceptWATER() (water.Conn, error) {
 
 	var core water.Core
 	var err error
-	core, err = water.NewCoreWithContext(l.ctx, l.config)
+	core, err = water.NewCoreWithContext(context.WithoutCancel(l.ctx), l.config)
 	if err != nil {
 		return nil, err
 	}
 
-	return accept(core)
+	return acceptContext(l.ctx, core)
 }

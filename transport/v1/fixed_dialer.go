@@ -46,7 +46,7 @@ func (f *FixedDialer) DialFixedContext(ctx context.Context) (conn water.Conn, er
 			return
 		}
 
-		conn, err = dialFixed(core)
+		conn, err = dialFixedContext(ctx, core)
 	}()
 
 	select {

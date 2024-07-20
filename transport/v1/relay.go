@@ -18,9 +18,10 @@ func init() {
 
 // Relay implements [water.Relay] utilizing Water WATM API v1.
 type Relay struct {
-	config  *water.Config
-	ctx     context.Context
-	running *atomic.Bool
+	config    *water.Config
+	ctx       context.Context
+	ctxCancel context.CancelFunc
+	running   *atomic.Bool
 
 	dialNetwork, dialAddress string
 
@@ -46,10 +47,13 @@ func NewRelay(c *water.Config) (water.Relay, error) {
 // Call [water.WazeroRuntimeConfigFactory.SetCloseOnContextDone] with false to
 // disable this behavior.
 func NewRelayWithContext(ctx context.Context, c *water.Config) (water.Relay, error) {
+	ctx, cancel := context.WithCancel(ctx)
+
 	return &Relay{
-		config:  c.Clone(),
-		ctx:     ctx,
-		running: new(atomic.Bool),
+		config:    c.Clone(),
+		ctx:       ctx,
+		ctxCancel: cancel,
+		running:   new(atomic.Bool),
 	}, nil
 }
 
@@ -74,7 +78,7 @@ func (r *Relay) RelayTo(network, address string) error {
 			return err
 		}
 
-		_, err = relay(core, network, address)
+		_, err = associate(core, network, address)
 		if err != nil {
 			if r.running.Load() { // errored before closing
 				return err
@@ -116,7 +120,7 @@ func (r *Relay) ListenAndRelayTo(lnetwork, laddress, rnetwork, raddress string) 
 			return err
 		}
 
-		_, err = relay(core, rnetwork, raddress)
+		_, err = associate(core, rnetwork, raddress)
 		if err != nil {
 			if r.running.Load() { // errored before closing
 				return err
@@ -139,6 +143,15 @@ func (r *Relay) Close() error {
 	}
 
 	return fmt.Errorf("water: relay is not configured")
+}
+
+// Shutdown implements [water.Relay].
+//
+// Unlike [Relay.Close], [Relay.Shutdown] will terminate
+// all established connections and stop the relay.
+func (r *Relay) Shutdown() error {
+	r.ctxCancel()
+	return r.Close()
 }
 
 // Addr implements [water.Relay].

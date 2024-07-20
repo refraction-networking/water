@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -39,6 +40,10 @@ type Conn struct {
 
 // dialFixed connects to a network address specified bv the WATM.
 func dialFixed(core water.Core) (c water.Conn, err error) {
+	return dialFixedContext(core.Context(), core)
+}
+
+func dialFixedContext(ctx context.Context, core water.Core) (c water.Conn, err error) {
 	tm := UpgradeCore(core)
 	conn := &Conn{
 		tm: tm,
@@ -68,7 +73,7 @@ func dialFixed(core water.Core) (c water.Conn, err error) {
 	}
 	conn.callerConn = callerConn
 
-	conn.dstConn, err = conn.tm.DialFixedFrom(reverseCallerConn)
+	conn.dstConn, err = conn.tm.DialFixedFrom(ctx, reverseCallerConn)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +83,7 @@ func dialFixed(core water.Core) (c water.Conn, err error) {
 	// and we need to close this connection in that case.
 	go conn.closeOnWorkerError()
 
-	if err := conn.tm.StartWorker(); err != nil {
+	if err := conn.tm.StartWorker(callerConn); err != nil {
 		return nil, err
 	}
 
@@ -87,6 +92,10 @@ func dialFixed(core water.Core) (c water.Conn, err error) {
 
 // dial dials the network address specified using the WATM.
 func dial(core water.Core, network, address string) (c water.Conn, err error) {
+	return dialContext(core.Context(), core, network, address)
+}
+
+func dialContext(ctx context.Context, core water.Core, network, address string) (c water.Conn, err error) {
 	tm := UpgradeCore(core)
 	conn := &Conn{
 		tm: tm,
@@ -122,7 +131,7 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 	}
 	conn.callerConn = callerConn
 
-	conn.dstConn, err = conn.tm.DialFrom(reverseCallerConn)
+	conn.dstConn, err = conn.tm.DialFrom(ctx, reverseCallerConn)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +141,7 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 	// and we need to close this connection in that case.
 	go conn.closeOnWorkerError()
 
-	if err := conn.tm.StartWorker(); err != nil {
+	if err := conn.tm.StartWorker(callerConn); err != nil {
 		return nil, err
 	}
 
@@ -142,6 +151,10 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 // accept accepts the network connection using through the WASM module
 // while using the net.Listener specified in core.config.
 func accept(core water.Core) (c water.Conn, err error) {
+	return acceptContext(core.Context(), core)
+}
+
+func acceptContext(ctx context.Context, core water.Core) (c water.Conn, err error) {
 	tm := UpgradeCore(core)
 	conn := &Conn{
 		tm: tm,
@@ -168,7 +181,7 @@ func accept(core water.Core) (c water.Conn, err error) {
 
 	conn.callerConn = callerConn
 
-	conn.srcConn, err = conn.tm.AcceptFor(reverseCallerConn)
+	conn.srcConn, err = conn.tm.AcceptFor(ctx, reverseCallerConn)
 	if err != nil {
 		return nil, err
 	}
@@ -178,14 +191,18 @@ func accept(core water.Core) (c water.Conn, err error) {
 	// and we need to close this connection in that case.
 	go conn.closeOnWorkerError()
 
-	if err := conn.tm.StartWorker(); err != nil {
+	if err := conn.tm.StartWorker(callerConn); err != nil {
 		return nil, err
 	}
 
 	return conn, nil
 }
 
-func relay(core water.Core, network, address string) (c water.Conn, err error) {
+func associate(core water.Core, network, address string) (c water.Conn, err error) {
+	return associateContext(core.Context(), core, network, address)
+}
+
+func associateContext(ctx context.Context, core water.Core, network, address string) (c water.Conn, err error) {
 	tm := UpgradeCore(core)
 	conn := &Conn{
 		tm: tm,
@@ -210,7 +227,7 @@ func relay(core water.Core, network, address string) (c water.Conn, err error) {
 		return nil, err
 	}
 
-	if err := conn.tm.Associate(); err != nil {
+	if err := conn.tm.Associate(ctx); err != nil {
 		return nil, err
 	}
 
