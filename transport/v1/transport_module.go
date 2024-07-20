@@ -862,6 +862,10 @@ func (tm *TransportModule) StartWorker(closers ...io.Closer) error {
 // WaitWorker waits for the worker thread to exit and returns the error
 // if any.
 func (tm *TransportModule) WaitWorker() error {
+	if tm == nil {
+		return fmt.Errorf("water: Transport Module is nil")
+	}
+
 	if tm.backgroundWorker == nil {
 		return fmt.Errorf("water: Transport Module is not initialized")
 	}

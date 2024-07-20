@@ -256,10 +256,11 @@ func (c *Conn) closeOnWorkerError() {
 
 	if err := tm.WaitWorker(); err != nil { // block until worker thread returns
 		log.LErrorf(core.Logger(), "water: WATMv1: worker thread returned with error: %v", err)
-		c.Close()
 	} else {
 		log.LDebugf(core.Logger(), "water: WATMv1: worker thread returned")
 	}
+
+	c.Close()
 }
 
 // Read implements the net.Conn interface.
@@ -309,7 +310,7 @@ func (c *Conn) Close() (err error) {
 		c.tmMutex.Lock()
 		if c.tm != nil {
 			err = c.tm.Close()
-			c.tm = nil
+			// c.tm = nil
 		}
 		c.tmMutex.Unlock()
 	})
