@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
+	"runtime"
 	"testing"
 	"time"
 
@@ -83,7 +84,7 @@ func TestListener(t *testing.T) {
 	t.Run("plain must work", testListenerPlain)
 	t.Run("reverse must work", testListenerReverse)
 	t.Run("bad addr must fail", testListenerBadAddr)
-	t.Run("partial WATM must fail", testListenerPartialWATM)
+	t.Run("Close", testListener_Close)
 }
 
 func testListenerBadAddr(t *testing.T) {
@@ -355,8 +356,89 @@ func testListenerReverse(t *testing.T) { // skipcq: GO-R1005
 	tripleGC(100 * time.Microsecond)
 }
 
-func testListenerPartialWATM(t *testing.T) {
-	t.Skip("skipping [testListenerPartialWATM]...") // TODO: implement this with a few WebAssembly Transport Modules which partially implement the v1 listener spec
+func testListener_Close(t *testing.T) {
+	// prepare
+	config := &water.Config{
+		TransportModuleBin:  wasmPlain,
+		ModuleConfigFactory: water.NewWazeroModuleConfigFactory(),
+	}
+
+	testLis, err := config.ListenContext(context.Background(), "tcp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer testLis.Close() // skipcq: GO-S2307
+
+	// Dial with net.Dial
+	peerConn, err := net.Dial("tcp", testLis.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer peerConn.Close() // skipcq: GO-S2307
+
+	conn, err := testLis.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close() // skipcq: GO-S2307
+
+	// type assertion: conn must be *v1.Conn
+	if _, ok := conn.(*v1.Conn); !ok {
+		t.Fatalf("conn is not *v1.Conn")
+	}
+
+	tripleGC(100 * time.Microsecond)
+
+	var wrBuf []byte = make([]byte, 1024)
+	var rdBuf []byte = make([]byte, 1024)
+
+	var closeChan = make(chan struct{})
+	go func() {
+		_, err := testLis.Accept()
+		if err == nil {
+			t.Errorf("testLis.Accept must fail after closing the listener")
+		}
+		close(closeChan)
+	}()
+
+	runtime.Gosched()
+
+	// close the listener, the connection must still work, and the Accept must fail
+	if err := testLis.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = rand.Read(wrBuf)
+	if err != nil {
+		t.Fatalf("rand.Read error: %s", err)
+	}
+
+	// after closing the listener, read/write MUST work
+	_, err = conn.Write(wrBuf)
+	if err != nil {
+		t.Fatalf("conn.Write error: %s", err)
+	}
+
+	n, err := peerConn.Read(rdBuf)
+	if err != nil {
+		t.Fatalf("peerConn.Read error: %s", err)
+	}
+
+	if n != len(wrBuf) {
+		t.Fatalf("peerConn.Read error: read %d bytes, want %d bytes", n, len(wrBuf))
+	}
+
+	if !bytes.Equal(rdBuf[:n], wrBuf) {
+		t.Fatalf("rdBuf != wrBuf")
+	}
+
+	// Accept should fail within 100ms
+	select {
+	case <-time.After(100 * time.Millisecond):
+		t.Fatalf("testLis.Accept must fail after closing the listener")
+	case <-closeChan:
+	}
+
 }
 
 // BenchmarkInboundListener currently measures only the inbound throughput
