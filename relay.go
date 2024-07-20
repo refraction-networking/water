@@ -41,6 +41,9 @@ type Relay interface {
 	// If no address is available, instead of panicking it returns nil.
 	Addr() net.Addr
 
+	// Shutdown terminates all established connections and stops the relay.
+	Shutdown() error
+
 	mustEmbedUnimplementedRelay()
 }
 
@@ -80,6 +83,11 @@ func (*UnimplementedRelay) Close() error {
 // Addr implements Relay.Addr().
 func (*UnimplementedRelay) Addr() net.Addr {
 	return nil
+}
+
+// Shutdown implements Relay.Shutdown().
+func (*UnimplementedRelay) Shutdown() error {
+	return ErrUnimplementedRelay
 }
 
 // mustEmbedUnimplementedRelay is a function that developers cannot

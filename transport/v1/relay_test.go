@@ -90,6 +90,9 @@ func ExampleRelay() {
 func TestRelay(t *testing.T) {
 	t.Run("plain must work", testRelayPlain)
 	t.Run("reverse must work", testRelayReverse)
+
+	t.Run("Close", testRelay_Close)
+	t.Run("Shutdown", testRelay_Shutdown)
 }
 
 func testRelayPlain(t *testing.T) { // skipcq: GO-R1005
@@ -366,4 +369,20 @@ func testRelayReverse(t *testing.T) { // skipcq: GO-R1005
 	if string(serverRecvBuf[:n]) != "olleh" {
 		t.Fatalf("serverRecvBuf != \"olleh\"")
 	}
+}
+
+func testRelay_Close(t *testing.T) {
+	t.Skip("TODO: implement")
+
+	// after close, established connection must work.
+
+	// new attempts to establish more connections must not work.
+}
+
+func testRelay_Shutdown(t *testing.T) {
+	t.Skip("TODO: implement")
+
+	// after shutdown, established connection must not work.
+
+	// new attempts to establish more connections must not work.
 }
