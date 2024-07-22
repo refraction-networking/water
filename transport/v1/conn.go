@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/refraction-networking/water"
+	"github.com/refraction-networking/water/internal/io/pipe"
 	"github.com/refraction-networking/water/internal/log"
-	"github.com/refraction-networking/water/internal/socket"
 )
 
 // Conn is the first experimental version of Conn implementation.
@@ -57,8 +57,7 @@ func dialFixed(core water.Core) (c water.Conn, err error) {
 		return nil, err
 	}
 
-	reverseCallerConn, callerConn, err := socket.TCPConnPair()
-	// wasmCallerConn, conn.uoConn, err = socket.TCPConnPair()
+	reverseCallerConn, callerConn, err := pipe.TCPPipe(nil)
 	if err != nil {
 		if reverseCallerConn == nil || callerConn == nil {
 			return nil, fmt.Errorf("water: socket.TCPConnPair returned error: %w", err)
@@ -111,13 +110,12 @@ func dial(core water.Core, network, address string) (c water.Conn, err error) {
 		return nil, err
 	}
 
-	reverseCallerConn, callerConn, err := socket.TCPConnPair()
-	// wasmCallerConn, conn.uoConn, err = socket.TCPConnPair()
+	reverseCallerConn, callerConn, err := pipe.TCPPipe(nil)
 	if err != nil {
 		if reverseCallerConn == nil || callerConn == nil {
-			return nil, fmt.Errorf("water: socket.TCPConnPair returned error: %w", err)
+			return nil, fmt.Errorf("water: pipe.TCPPipe returned error: %w", err)
 		} else { // likely due to Close() call errored
-			log.LErrorf(core.Logger(), "water: socket.TCPConnPair returned error: %v", err)
+			log.LErrorf(core.Logger(), "water: pipe.TCPPipe returned error: %v", err)
 		}
 	}
 	conn.callerConn = callerConn
@@ -155,7 +153,7 @@ func accept(core water.Core) (c water.Conn, err error) {
 		return nil, err
 	}
 
-	reverseCallerConn, callerConn, err := socket.TCPConnPair()
+	reverseCallerConn, callerConn, err := pipe.TCPPipe(nil)
 	if err != nil {
 		if reverseCallerConn == nil || callerConn == nil {
 			return nil, fmt.Errorf("water: socket.TCPConnPair returned error: %w", err)
