@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/refraction-networking/water"
+	"github.com/refraction-networking/water/internal/io/pipe"
 	"github.com/refraction-networking/water/internal/log"
-	"github.com/refraction-networking/water/internal/socket"
 	"github.com/refraction-networking/water/internal/wasip1"
 	"github.com/tetratelabs/wazero/api"
 )
@@ -773,7 +773,7 @@ func (tm *TransportModule) StartWorker() error {
 	}
 
 	// create control pipe connection pair
-	ctrlConnR, ctrlConnW, err := socket.TCPConnPair()
+	ctrlConnR, ctrlConnW, err := pipe.TCPPipe(nil)
 	if err != nil {
 		return fmt.Errorf("water: creating cancel pipe failed: %w", err)
 	}

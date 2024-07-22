@@ -10,9 +10,7 @@ retract (
 replace github.com/tetratelabs/wazero => github.com/refraction-networking/wazero v1.7.3-w
 
 require (
-	github.com/gaukas/wazerofs v0.1.0
+	github.com/blang/vfs v1.0.0
 	github.com/tetratelabs/wazero v1.7.3
-	google.golang.org/protobuf v1.33.0
+	google.golang.org/protobuf v1.34.2
 )
-
-require github.com/blang/vfs v1.0.0 // indirect
